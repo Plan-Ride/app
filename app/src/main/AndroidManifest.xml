@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Nearby stops on the Departures tab -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- "Will I catch it?": walking time to the stop needs a precise fix; used on the phone only. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Automatic mode: GPS while following a bus with the app closed (regular rides start from an alarm) -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Low-credit and expiry reminders -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Following a bus: ongoing Live Update notification (Now Bar on Samsung One UI 8) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Regular rides: start following on time (the user allows it in system settings on Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Regular rides: set their alarms again after a restart -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- No ads: Firebase Analytics must not use the advertising ID -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" />
+
+    <application
+        android:name=".PlanRideApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TestEM">
+        <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.TestEM"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 2.17.0: "Take me home" / "To work" on the launcher icon, and for Google Assistant. -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity>
+        <!-- "Stop following" from the Plan&Ride watch app (EM-0041). -->
+        <service android:name=".live.WatchStopService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/plan-ride/stop" />
+                <data android:scheme="wear" android:host="*" android:path="/plan-ride/watch-log" />
+                <data android:scheme="wear" android:host="*" android:path="/plan-ride/refresh" />
+                <data android:scheme="wear" android:host="*" android:path="/plan-ride/action" />
+                <data android:scheme="wear" android:host="*" android:path="/plan-ride/start" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".live.TripTrackerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|location">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Live progress of the bus trip the user chose to follow" />
+        </service>
+        <receiver
+            android:name=".widget.PlanRideWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/plan_ride_widget" />
+        </receiver>
+        <receiver
+            android:name=".widget.StopWidgetReceiver"
+            android:exported="true"
+            android:label="@string/stop_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/stop_widget" />
+        </receiver>
+        <!-- 2.17.0: Home and Work, one tap each ("Take me home"). -->
+        <receiver
+            android:name=".widget.PlacesWidgetReceiver"
+            android:exported="true"
+            android:label="@string/places_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/places_widget" />
+        </receiver>
+        <!-- Starting to follow from the watch, through an exact alarm (EM-0041). -->
+        <receiver android:name=".live.WatchStartReceiver" android:exported="false" />
+        <receiver
+            android:name=".rides.RideAlarmReceiver"
+            android:exported="false" />
+        <!-- A bus followed long before it leaves: the live notification starts shortly before (EM-0054). -->
+        <receiver
+            android:name=".live.FollowLaterReceiver"
+            android:exported="false" />
+        <!-- "Leave by" for starred journeys. -->
+        <receiver
+            android:name=".reminders.LeaveByReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".rides.RideRescheduleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

@@ -1,0 +1,859 @@
+package com.ksjd.testem.ui.screens
+
+import com.ksjd.testem.ui.components.Haptics
+import com.ksjd.testem.ui.components.rememberHaptic
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.ksjd.testem.R
+import com.ksjd.testem.live.BoardState
+import com.ksjd.testem.live.LiveDeparture
+import com.ksjd.testem.live.LiveState
+import com.ksjd.testem.live.LiveStop
+import com.ksjd.testem.live.LiveViewModel
+import com.ksjd.testem.live.LocationStatus
+import com.ksjd.testem.live.PositionSource
+import com.ksjd.testem.live.TrackedTrip
+import com.ksjd.testem.live.TripSheetState
+import com.ksjd.testem.live.TripTracking
+import com.ksjd.testem.ui.Format
+import com.ksjd.testem.ui.components.DelayLabel
+import com.ksjd.testem.ui.components.EmptyState
+import com.ksjd.testem.ui.components.GroupDivider
+import com.ksjd.testem.ui.components.LinePlate
+import com.ksjd.testem.ui.components.ListGroup
+import com.ksjd.testem.ui.components.ListRow
+import com.ksjd.testem.ui.components.Notice
+import com.ksjd.testem.ui.components.NoticeTone
+import com.ksjd.testem.ui.components.ScreenHeader
+import com.ksjd.testem.ui.components.SectionLabel
+import com.ksjd.testem.ui.components.countdownText
+import com.ksjd.testem.ui.theme.Barlow
+import com.ksjd.testem.ui.theme.TimeStyle
+import com.ksjd.testem.ui.theme.TransitTheme
+import kotlinx.coroutines.delay
+
+@Composable
+fun DeparturesScreen(liveViewModel: LiveViewModel) {
+    Column(Modifier.fillMaxSize()) {
+        JourneyDraftBar(Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        Box(Modifier.weight(1f)) { DeparturesContent(liveViewModel) }
+    }
+}
+
+@Composable
+private fun DeparturesContent(liveViewModel: LiveViewModel) {
+    val state by liveViewModel.state.collectAsState()
+    val board = state.board
+    if (board != null) {
+        BackHandler(onBack = liveViewModel::closeStop)
+        StopBoard(
+            board = board,
+            isFavourite = board.stop.id in state.favouriteIds,
+            onBack = liveViewModel::closeStop,
+            onToggleFavourite = { liveViewModel.toggleFavourite(board.stop) },
+            onRetry = liveViewModel::refreshBoard,
+            onOpenTrip = liveViewModel::openTrip
+        )
+    } else {
+        StopFinder(state, liveViewModel)
+    }
+}
+
+// --------------------------------------------------------------------------
+// Stop finder
+// --------------------------------------------------------------------------
+
+@Composable
+private fun StopFinder(state: LiveState, vm: LiveViewModel) {
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.findNearby() else vm.onLocationPermissionDenied()
+    }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
+        item {
+            // A code someone told you (they share their bus): it opens here once they accept.
+            var enteringCode by remember { mutableStateOf(false) }
+            if (enteringCode) EnterShareCodeDialog(onTrip = { enteringCode = false; vm.openFollowed(it) }) { enteringCode = false }
+            ScreenHeader(
+                title = stringResource(R.string.departures_title),
+                actions = { TextButton(onClick = { enteringCode = true }) { Text(stringResource(R.string.share_enter_button)) } }
+            )
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = vm::search,
+                placeholder = { Text(stringResource(R.string.departures_search_hint)) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (state.query.isNotEmpty()) {
+                        IconButton(onClick = { vm.search("") }) {
+                            Icon(Icons.Outlined.Close, stringResource(R.string.clear))
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = Color.Transparent
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+            if (state.stopsFailed) {
+                Notice(
+                    stringResource(R.string.departures_stops_failed),
+                    tone = NoticeTone.Error,
+                    actionLabel = stringResource(R.string.retry),
+                    onAction = { vm.retryStops() },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        if (state.query.isNotBlank()) {
+            item {
+                if (state.results.isEmpty()) {
+                    EmptyState(
+                        title = stringResource(R.string.departures_no_match_title),
+                        body = stringResource(R.string.departures_no_match_body)
+                    )
+                } else {
+                    Spacer(Modifier.height(8.dp))
+                    ListGroup {
+                        state.results.forEachIndexed { index, stop ->
+                            if (index > 0) GroupDivider()
+                            StopRow(stop, stop.id in state.favouriteIds, null, { vm.openStop(stop) }) { vm.toggleFavourite(stop) }
+                        }
+                    }
+                }
+            }
+            return@LazyColumn
+        }
+
+        item {
+            SectionLabel(stringResource(R.string.departures_favourites))
+            if (state.favourites.isEmpty()) {
+                Text(
+                    stringResource(R.string.departures_favourites_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            } else {
+                ListGroup {
+                    state.favourites.forEachIndexed { index, stop ->
+                        if (index > 0) GroupDivider()
+                        StopRow(stop, true, null, { vm.openStop(stop) }) { vm.toggleFavourite(stop) }
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionLabel(stringResource(R.string.departures_nearby)) {
+                if (state.locationStatus == LocationStatus.Ready) {
+                    TextButton(onClick = { vm.findNearby(fresh = true) }) { Text(stringResource(R.string.refresh_button)) }
+                }
+            }
+            when (state.locationStatus) {
+                LocationStatus.Ready -> ListGroup {
+                    state.nearby.forEachIndexed { index, (stop, meters) ->
+                        if (index > 0) GroupDivider()
+                        StopRow(stop, stop.id in state.favouriteIds, meters, { vm.openStop(stop) }) { vm.toggleFavourite(stop) }
+                    }
+                }
+                LocationStatus.Locating -> Row(
+                    Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.departures_locating), style = MaterialTheme.typography.bodyMedium)
+                }
+                else -> Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when (state.locationStatus) {
+                        LocationStatus.Denied -> Notice(stringResource(R.string.departures_location_denied))
+                        LocationStatus.Unavailable -> Notice(stringResource(R.string.departures_location_unavailable))
+                        else -> Unit
+                    }
+                    OutlinedButton(
+                        onClick = { permission.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Outlined.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.departures_find_nearby))
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun StopRow(stop: LiveStop, favourite: Boolean, distanceMeters: Int?, onOpen: () -> Unit, onToggleFavourite: () -> Unit) {
+    val haptic = rememberHaptic()
+    val platforms = pluralStringResource(R.plurals.platform_count, stop.platforms.size, stop.platforms.size)
+    val subtitle = if (distanceMeters != null) {
+        stringResource(R.string.departures_distance, formatDistance(distanceMeters), platforms)
+    } else {
+        platforms
+    }
+    ListRow(
+        title = stop.name,
+        subtitle = subtitle,
+        onClick = onOpen,
+        trailing = {
+            IconButton(onClick = { haptic(Haptics.CONFIRM); onToggleFavourite() }) {
+                Icon(
+                    if (favourite) Icons.Outlined.Star else Icons.Outlined.StarOutline,
+                    contentDescription = stringResource(if (favourite) R.string.favourite_remove else R.string.favourite_add),
+                    tint = if (favourite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    )
+}
+
+private fun formatDistance(meters: Int): String =
+    if (meters < 1000) "$meters m" else "%.1f km".format(meters / 1000.0)
+
+// --------------------------------------------------------------------------
+// Departure board
+// --------------------------------------------------------------------------
+
+@Composable
+private fun StopBoard(
+    board: BoardState,
+    isFavourite: Boolean,
+    onBack: () -> Unit,
+    onToggleFavourite: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenTrip: (LiveDeparture) -> Unit
+) {
+    val colors = TransitTheme.colors
+    val haptic = rememberHaptic()
+    // Tick every second so countdowns move between network refreshes.
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(colors.board)
+    ) {
+        Row(
+            Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back), tint = colors.boardText)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    board.stop.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = colors.boardText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (board.updatedAtMs > 0) stringResource(R.string.board_updated, Format.clockWithSeconds(board.updatedAtMs))
+                    else stringResource(R.string.board_loading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.boardDim
+                )
+            }
+            IconButton(onClick = { haptic(Haptics.CONFIRM); onToggleFavourite() }) {
+                Icon(
+                    if (isFavourite) Icons.Outlined.Star else Icons.Outlined.StarOutline,
+                    contentDescription = stringResource(if (isFavourite) R.string.favourite_remove else R.string.favourite_add),
+                    tint = if (isFavourite) colors.live else colors.boardText
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            board.isLoading && board.departures.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = colors.live)
+            }
+            board.departures.isEmpty() -> Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    stringResource(if (board.hasError) R.string.board_error else R.string.board_empty),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.boardText
+                )
+                if (board.hasError) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry), color = colors.live) }
+            }
+            else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
+                if (board.hasError) {
+                    item {
+                        Text(
+                            stringResource(R.string.board_stale),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.live,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                items(board.departures, key = { it.key }) { departure ->
+                    val highlighted = board.highlight?.let {
+                        it.line.equals(departure.line, ignoreCase = true) &&
+                            it.time == Format.secondOfDay(departure.plannedSecondOfDay)
+                    } == true
+                    BoardRow(departure, now, highlighted) { onOpenTrip(departure) }
+                }
+                item {
+                    Text(
+                        stringResource(R.string.board_legend),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.boardDim,
+                        modifier = Modifier.padding(20.dp)
+                    )
+                    // 2.17.0: something wrong here (no timetable, a stop moved, a bus missing): tell us.
+                    var reporting by remember { mutableStateOf(false) }
+                    if (reporting) SubmitDialog(SubmitKind.Problem, stopName = board.stop.name) { reporting = false }
+                    androidx.compose.material3.OutlinedButton(onClick = { reporting = true }, modifier = Modifier.padding(horizontal = 20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.boardDim)) {
+                        Text(stringResource(R.string.submit_report_stop), color = colors.boardText)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoardRow(departure: LiveDeparture, now: Long, highlighted: Boolean, onClick: () -> Unit) {
+    val colors = TransitTheme.colors
+    val elapsed = ((now - departure.fetchedAtMs) / 1000L).toInt()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 3.dp)
+            .background(colors.boardRow, RoundedCornerShape(10.dp))
+            .then(if (highlighted) Modifier.border(2.dp, colors.live, RoundedCornerShape(10.dp)) else Modifier)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LinePlate(departure.line, onBoard = true)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                departure.destination,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.boardText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textDecoration = if (departure.isCancelled) TextDecoration.LineThrough else null
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (departure.platformNumber.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.board_platform, departure.platformNumber),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.boardDim
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
+                if (departure.isCancelled) {
+                    Text(stringResource(R.string.board_cancelled), style = MaterialTheme.typography.labelMedium, color = colors.late)
+                } else if (departure.fromTimetable) {
+                    // Another carrier: timetable only, so name who runs it instead of a delay.
+                    Text(
+                        departure.operator.ifBlank { stringResource(R.string.board_other_carrier) },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.boardDim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    DelayLabel(departure.delaySeconds, onBoard = true)
+                }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            if (departure.isRealtime) {
+                Text(
+                    countdownText(departure.secondsUntil - elapsed),
+                    style = TimeStyle.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold),
+                    color = colors.live
+                )
+                Text(Format.secondOfDay(departure.plannedSecondOfDay), style = MaterialTheme.typography.bodySmall, color = colors.boardDim)
+            } else {
+                Text(
+                    Format.secondOfDay(departure.plannedSecondOfDay),
+                    style = TimeStyle.copy(fontSize = 22.sp),
+                    color = colors.boardText
+                )
+                Text(
+                    stringResource(if (departure.fromTimetable) R.string.board_timetable else R.string.board_scheduled),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.boardDim
+                )
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// Trip sheet
+// --------------------------------------------------------------------------
+
+/** Stops of one bus with the Follow button; shown over any tab (Departures or Planner). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?) -> Unit = {}) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val tracked by TripTracking.active.collectAsState()
+    val following = tracked?.ref == sheet.ref
+    // EM-0103: the followed bus is shown as the live card has it (its delay and place, also from this phone on board),
+    // not as the sheet's own look at it, so the two can't say different things.
+    val live = TripTracking.view.collectAsState().value?.takeIf { following && it.trip.ref == sheet.ref && sheet.detail != null }
+    val trip = if (live != null) sheet.copy(detail = live.detail) else sheet
+    var showMap by remember { mutableStateOf(false) }
+    val alight = if (following) tracked?.alightOrder else trip.alightOrder
+    if (showMap && trip.detail != null) BusMapDialog(trip.ref, trip.detail, alight) { showMap = false }
+    var sharing by remember { mutableStateOf(false) }
+    if (sharing) {
+        val shared = if (following) tracked!! else com.ksjd.testem.live.TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder)
+        ShareTripDialog(shared, trip.detail?.destination.orEmpty()) { sharing = false }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LinePlate(trip.ref.line)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        trip.detail?.destination ?: trip.ref.destination,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val community = trip.detail?.community
+                    if (trip.ref.isScheduleOnly && community != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            DelayLabel(community.delaySeconds)
+                            Text(
+                                " " + pluralStringResource(R.plurals.community_riders, community.reporters, community.reporters),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else if (trip.ref.isScheduleOnly) {
+                        Text(
+                            stringResource(R.string.track_schedule_only),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        DelayLabel(trip.detail?.delaySeconds)
+                    }
+                    val history = trip.detail?.history
+                    if (history != null && trip.detail.positionSource.let { it == PositionSource.Timetable || it == PositionSource.History }) {
+                        Text(
+                            Format.history(context, history, history.now(trip.detail)),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                // Where the bus is on a map, and the bus as a link for someone else (the web version opens it).
+                if (trip.detail?.stops?.isNotEmpty() == true) {
+                    IconButton(onClick = { showMap = true }) { Icon(Icons.Outlined.Map, stringResource(R.string.busmap_open)) }
+                }
+                IconButton(onClick = { sharing = true }) { Icon(Icons.Outlined.Share, stringResource(R.string.share_trip)) }
+            }
+            Spacer(Modifier.height(12.dp))
+            JourneyDraftBar(Modifier.padding(bottom = 8.dp))
+            FollowControls(trip)
+        }
+        when {
+            trip.isLoading -> Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+            trip.hasError || trip.detail == null || trip.detail.stops.isEmpty() -> EmptyState(
+                title = stringResource(R.string.trip_unavailable_title),
+                body = stringResource(R.string.trip_unavailable_body)
+            )
+            else -> Column {
+            // EM-0062: S.A.D.'s own list of this bus leaves stops out (line 1 to Zeleznicna stanica: stops 1-3, then 12).
+            if (!trip.detail.fromTimetable && !trip.ref.isScheduleOnly &&
+                trip.detail.stops.zipWithNext().any { (a, b) -> b.order - a.order > 1 }) {
+                Notice(stringResource(R.string.trip_stops_missing), modifier = Modifier.padding(bottom = 8.dp))
+            }
+            TripTimeline(
+                stops = trip.detail.stops,
+                delays = trip.detail.stops.indices.map(trip.detail::delayAt),
+                nextStop = live?.progress?.shownNextIndex,
+                // EM-0057: where you get on is marked too (the timetable says it, or the platform the board was opened at).
+                boardOrder = trip.detail.boardingOrder ?: (if (following) tracked?.boardingPlatformIds else trip.boardingPlatformIds)
+                    ?.takeIf { it.isNotEmpty() }?.let { ids -> trip.detail.stops.firstOrNull { it.platformId in ids }?.order },
+                alightOrder = alight,
+                onStopClick = if (following) {
+                    { order ->
+                        val new = order.takeIf { it != tracked?.alightOrder }
+                        TripTracking.setAlightStop(context, new, trip.detail.stops.firstOrNull { it.order == new })
+                    }
+                } else {
+                    // Not followed yet: pick where to get off, e.g. to change to another bus.
+                    { order -> onPickAlight(order.takeIf { it != trip.alightOrder }) }
+                }
+            )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripTimeline(
+    stops: List<com.ksjd.testem.live.TripStop>,
+    /** Per stop: the delay to count there (null: none known). */
+    delays: List<Int?>,
+    /** The followed bus: the stop the live card names as next (null: worked out from the times). */
+    nextStop: Int? = null,
+    boardOrder: Int?,
+    alightOrder: Int?,
+    onStopClick: ((Int) -> Unit)?
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val muted = MaterialTheme.colorScheme.outline
+    val now = System.currentTimeMillis()
+    // Expected departure per stop: actual if reported, otherwise schedule + current delay.
+    val expected = stops.mapIndexed { i, stop ->
+        stop.actualMs ?: (stop.scheduledMs + (delays.getOrNull(i) ?: 0) * 1000L)
+    }
+    // The operator does not always report actual times, so infer progress from the clock too.
+    val nextIndex = nextStop ?: stops.indices.firstOrNull { i -> stops[i].actualMs == null && expected[i] >= now - 30_000L } ?: stops.size
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (nextIndex - 1).coerceIn(0, (stops.size - 1).coerceAtLeast(0)))
+    LazyColumn(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp),
+        state = listState
+    ) {
+        items(stops.size) { index ->
+            val stop = stops[index]
+            val isNext = index == nextIndex
+            val passed = index < nextIndex
+            val expectedMs = if (stop.actualMs != null || delays.getOrNull(index) != null) expected[index] else null
+            val isAlight = stop.order == alightOrder
+            val isBoard = !isAlight && stop.order == boardOrder
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicRowHeight)
+                    .then(if (onStopClick != null && !passed) Modifier.clickable { onStopClick(stop.order) } else Modifier)
+                    .then(
+                        when {
+                            isAlight -> Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                            isBoard -> Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                            else -> Modifier
+                        }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Rail with a stop marker; passed stops are drawn in the brand colour.
+                Box(
+                    Modifier
+                        .padding(start = 28.dp)
+                        .width(20.dp)
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier
+                            .width(3.dp)
+                            .fillMaxSize()
+                            .padding(
+                                top = if (index == 0) IntrinsicRowHeight / 2 else 0.dp,
+                                bottom = if (index == stops.lastIndex) IntrinsicRowHeight / 2 else 0.dp
+                            )
+                            .background(if (passed) primary else muted)
+                    )
+                    Box(
+                        Modifier
+                            .size(if (isNext) 14.dp else 10.dp)
+                            .background(if (passed || isNext) primary else MaterialTheme.colorScheme.surface, CircleShape)
+                            .border(2.dp, if (passed || isNext) primary else muted, CircleShape)
+                    )
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stop.name,
+                        style = if (isNext || isAlight || isBoard) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                        color = if (passed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isAlight) {
+                        Text(stringResource(R.string.track_your_stop), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                    if (isBoard) {
+                        Text(stringResource(R.string.track_board_stop), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                    stop.goesOnAs?.let { line ->
+                        Text(stringResource(R.string.track_goes_on_as, line), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (stop.platform.isNotBlank()) {
+                        Text(
+                            stringResource(R.string.planner_platform, stop.platform),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 20.dp)) {
+                    val showExpected = expectedMs != null && Format.clock(expectedMs) != Format.clock(stop.scheduledMs)
+                    Text(
+                        Format.clock(stop.scheduledMs),
+                        style = TimeStyle.copy(fontSize = 15.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = if (showExpected) TextDecoration.LineThrough else null
+                    )
+                    if (showExpected) {
+                        Text(Format.clock(expectedMs!!), style = TimeStyle.copy(fontSize = 15.sp, fontFamily = Barlow))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val IntrinsicRowHeight = 52.dp
+
+/** "Follow this bus" / "Stop following", including the notification permission request. */
+@Composable
+private fun FollowControls(trip: TripSheetState) {
+    val context = LocalContext.current
+    val liveViewModel: LiveViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val tracked by TripTracking.active.collectAsState()
+    val others by TripTracking.others.collectAsState()
+    // EM-0100: followed too, waiting its turn behind a bus that leaves sooner.
+    val waiting = others.any { it.ref == trip.ref }
+    val following = tracked?.ref == trip.ref || waiting
+    var denied by remember { mutableStateOf(false) }
+    val haptic = rememberHaptic()
+    val start = {
+        haptic(Haptics.CONFIRM)
+        TripTracking.start(context, trip.detail?.let { com.ksjd.testem.live.draftLeg(trip, it).trip } ?: TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder))
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        denied = !granted
+        if (granted) start()
+    }
+    if (following) {
+        Text(
+            stringResource(if (waiting) R.string.track_following_later else R.string.track_following),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { TripTracking.stop(context, trip.ref) },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.track_stop)) }
+    } else {
+        Button(
+            onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    start()
+                }
+            },
+            enabled = trip.detail?.stops?.isNotEmpty() == true,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Outlined.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.track_start))
+        }
+        if (denied) {
+            Spacer(Modifier.height(8.dp))
+            Notice(stringResource(R.string.track_permission_needed))
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { liveViewModel.addToDraft(trip) },
+            enabled = trip.detail?.stops?.isNotEmpty() == true,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.journey_add)) }
+        if (trip.alightOrder == null) {
+            Text(stringResource(R.string.journey_pick_alight), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+/** Runs an action once notifications are allowed (asks first on Android 13+). */
+@Composable
+internal fun rememberWithNotifications(): (() -> Unit) -> Unit {
+    val context = LocalContext.current
+    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) pending?.invoke()
+        pending = null
+    }
+    return { action ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pending = action
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else action()
+    }
+}
+
+/** The journey the user is building bus by bus: "My journey: 1 → 101", Follow, Clear. */
+@Composable
+internal fun JourneyDraftBar(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val app: com.ksjd.testem.AppViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val draft by TripTracking.draft.collectAsState()
+    val timetable by app.timetableState.collectAsState()
+    var editing by remember { mutableStateOf<com.ksjd.testem.RecurringRide?>(null) }
+    val withNotifications = rememberWithNotifications()
+    editing?.let { ride ->
+        RideEditorDialog(ride, isNew = true, onSave = { app.saveRide(it); editing = null }, onDelete = { editing = null }, onDismiss = { editing = null })
+    }
+    if (draft.isEmpty()) return
+    val connection = app.draftConnection(draft)
+    val saved = connection != null && timetable.savedJourneys.any { it.sameAs(connection) }
+    // EM-0066: a tap on "My journey" lists its buses (times and stops).
+    var open by remember { mutableStateOf(false) }
+    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+      Column {
+        Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.journey_draft, draft.joinToString(" → ") { it.trip.ref.line }),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).clickable { open = !open }.padding(vertical = 8.dp)
+            )
+            // Like a planner result: star it for the home tab, or make it a regular ride.
+            IconButton(onClick = { app.toggleSaveDraft(draft) }, enabled = connection != null) {
+                Icon(
+                    if (saved) Icons.Outlined.Star else Icons.Outlined.StarOutline,
+                    stringResource(if (saved) R.string.planner_unsave_journey else R.string.planner_save_journey),
+                    tint = if (saved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = { app.rideFromDraft(draft) { editing = it } }, enabled = connection != null) {
+                Icon(Icons.Outlined.EventRepeat, stringResource(R.string.rides_repeat))
+            }
+            IconButton(onClick = TripTracking::clearDraft) { Icon(Icons.Outlined.Close, stringResource(R.string.journey_clear)) }
+            Button(onClick = {
+                withNotifications {
+                    Haptics.perform(view, Haptics.CONFIRM)
+                    TripTracking.startJourney(context, draft.map { it.trip })
+                    TripTracking.clearDraft()
+                }
+            }) { Text(stringResource(R.string.journey_start)) }
+        }
+        if (open) {
+            draft.mapNotNull { it.segment }.forEach { s ->
+                Text(
+                    "${s.line.trim().substringAfterLast(' ')}  ${s.departureTime} ${s.departureStop} → ${s.arrivalTime} ${s.arrivalStop}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                )
+            }
+        }
+      }
+    }
+}

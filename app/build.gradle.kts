@@ -1,0 +1,155 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
+}
+
+import java.util.Properties
+import java.io.FileInputStream
+
+// The "What's new" summary is written for one version; a release can't go out with an older one's.
+val checkWhatsNew by tasks.registering {
+    val strings = file("src/main/res/values/strings.xml")
+    inputs.file(strings)
+    doLast {
+        val tagged = Regex("<string name=\"whats_new_version\"[^>]*>([^<]*)</string>").find(strings.readText())?.groupValues?.get(1)
+        val version = android.defaultConfig.versionName
+        check(tagged == version) { "whats_new_version is $tagged but the app is $version: write the What's new summary (values and values-sk) and update whats_new_version" }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkWhatsNew) }
+
+android {
+    namespace = "com.ksjd.testem"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.ksjd.testem"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 35
+        versionName = "2.18.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // emhub endpoint and app key: the private repo's secrets/hub.properties (outside this
+        // public folder), else local.properties. Without a key, bug reports and community are off.
+        val local = Properties().apply {
+            listOf(rootProject.file("../secrets/hub.properties"), rootProject.file("local.properties"))
+                .firstOrNull { it.exists() && it.readText().contains("hub.appKey") }
+                ?.inputStream()?.use { load(it) }
+        }
+        buildConfigField("String", "HUB_URL", "\"${local.getProperty("hub.url", "https://par.karafa.net")}\"")
+        buildConfigField("String", "HUB_APP_KEY", "\"${local.getProperty("hub.appKey", "")}\"")
+    }
+
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                val storeFilePath = (keystoreProperties["storeFile"] as String?)?.trim().orEmpty()
+                val resolvedStoreFile = when {
+                    storeFilePath.isBlank() -> rootProject.file("app/testEM-release.keystore")
+                    storeFilePath.endsWith(".properties", ignoreCase = true) -> {
+                        rootProject.file("app/testEM-release.keystore")
+                    }
+                    else -> rootProject.file(storeFilePath)
+                }
+                storeFile = resolvedStoreFile
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        // java.time on Android 7 (API 24-25): without it the app crashed at the first date it touched.
+        isCoreLibraryDesugaringEnabled = true
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation(platform("com.google.firebase:firebase-bom:33.4.0"))
+    implementation("com.google.firebase:firebase-analytics")
+
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    // Where the bus is, on OpenStreetMap (no API key; tiles from openstreetmap.org)
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // The followed bus on the Plan&Ride watch app (EM-0041).
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    // Opens Plan&Ride's page in the Play Store on the watch (the phone's Play Store doesn't offer the watch app).
+    implementation("androidx.wear:wear-remote-interactions:1.1.0")
+
+    // Lifecycle / ViewModel
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.6")
+
+    // Compose
+    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Networking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // JSON parsing
+    implementation("com.google.code.gson:gson:2.11.0")
+
+    // HTML parsing
+
+    // QR Code generation
+    implementation("com.google.zxing:core:3.5.3")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+}

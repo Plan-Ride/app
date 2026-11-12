@@ -1,0 +1,48 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Local signing/config files
+keystore.properties
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.pk8
+
+# Local helper scripts (not needed in repo)
+build.bat
+BUILD_REFERENCE.bat
+
+*.jks
+*.apk
+*.aab
+*.apks
+# Transient migration and build documentation (Android-exclusive and outdated)
+BUILD_FIX_SUMMARY.md
+BUILD_INSTRUCTIONS.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_BUILD.md
+README_QR_DAEMON.md
+VERIFICATION_CHECKLIST.md
+
+# Legacy code folder (if not already ignored)
+testEM-old/
+google-services.json
+# Build output
+.kotlin/
+**/build/
+
+# emhub runtime files
+hub/*.db
+__pycache__/
+# CLI builds (the IDE locks app/build)
+/app/build-cli

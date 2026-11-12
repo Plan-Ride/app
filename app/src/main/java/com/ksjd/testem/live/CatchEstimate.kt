@@ -1,0 +1,129 @@
+package com.ksjd.testem.live
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+
+/** Will the user reach their stop before the bus? Pure logic, no Android types. */
+data class CatchEstimate(val walkSeconds: Int, val marginSeconds: Int) {
+    enum class Verdict { AtStop, Relaxed, LeaveSoon, LeaveNow, Miss }
+
+    val verdict: Verdict
+        get() = when {
+            walkSeconds <= AT_STOP_WALK_S -> Verdict.AtStop
+            marginSeconds < 0 -> Verdict.Miss
+            marginSeconds <= 60 -> Verdict.LeaveNow
+            marginSeconds <= 5 * 60 -> Verdict.LeaveSoon
+            else -> Verdict.Relaxed
+        }
+
+    companion object {
+        /** Typical walking pace; the knob to tune if estimates run early or late. */
+        const val WALK_METERS_PER_SECOND = 1.3
+        /** Streets are not straight lines. */
+        const val DETOUR_FACTOR = 1.3
+        private const val AT_STOP_WALK_S = 45
+
+        /** Share of the remaining walk to wait before checking the location again. */
+        const val RECHECK_SHARE = 0.75
+        const val MIN_RECHECK_MS = 60_000L
+        const val MAX_RECHECK_MS = 3 * 60_000L
+
+        /**
+         * When to look at the phone's location again before the user is at the stop: after most
+         * of the remaining walk, but every 1 to 3 min. GPS stays off in between.
+         */
+        fun nextCheckMs(distanceMeters: Int): Long {
+            val walkMs = distanceMeters * DETOUR_FACTOR / WALK_METERS_PER_SECOND * 1000
+            return (walkMs * RECHECK_SHARE).toLong().coerceIn(MIN_RECHECK_MS, MAX_RECHECK_MS)
+        }
+
+        /** Closer than this the rider walks, car or not. */
+        const val CAR_FROM_M = 300
+        /** EM-0072: by car without the router's answer: roads 40 % longer than the straight line, at 50 km/h. */
+        const val CAR_DETOUR_FACTOR = 1.4
+        const val CAR_FALLBACK_METERS_PER_SECOND = 13.9
+
+        /**
+         * [byCar]: the rider is driven to the stop (dropped off, no parking): [driveSeconds] is the router's time along
+         * the roads at their speeds, else a rough guess. Close to the stop it's a walk either way.
+         */
+        fun from(distanceMeters: Int, secondsToBoarding: Int, byCar: Boolean = false, driveSeconds: Int? = null): CatchEstimate {
+            val walk = if (byCar && distanceMeters > CAR_FROM_M)
+                driveSeconds ?: (distanceMeters * CAR_DETOUR_FACTOR / CAR_FALLBACK_METERS_PER_SECOND).toInt()
+                else (distanceMeters * DETOUR_FACTOR / WALK_METERS_PER_SECOND).toInt()
+            return CatchEstimate(walk, secondsToBoarding - walk)
+        }
+
+        /** The router's drive from [fromLat]/[fromLon] (sent rounded to ~100 m) to the stop, in seconds, or null. */
+        fun driveSeconds(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): Int? = runCatching {
+            com.ksjd.testem.hub.HubClient.timetable("drive", mapOf(
+                "from" to "%.3f,%.3f".format(java.util.Locale.ROOT, fromLat, fromLon),
+                "to" to "%.4f,%.4f".format(java.util.Locale.ROOT, toLat, toLon)
+            )).get("seconds").asInt
+        }.getOrNull()
+    }
+}
+
+/** Location on the phone only; it is never sent anywhere. */
+object Locations {
+    fun hasPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** Precise (fine) location: approximate can be kilometres off, useless for walking time. */
+    fun hasPrecise(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** "All the time": lets a ride started by an alarm, or a restarted service, still get GPS. */
+    fun hasBackground(context: Context): Boolean =
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /**
+     * A fix no older than [maxAgeMs]: a recent cached one, else a fresh one (fused provider
+     * first; it works with approximate permission too). [fallbackToLastKnown] returns an older
+     * cached fix when no fresh one arrives, which is fine for "stops near me" but not for timing.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun current(context: Context, maxAgeMs: Long = 10 * 60 * 1000L, fallbackToLastKnown: Boolean = false,
+                        gpsTimeoutMs: Long = 10_000L): Location? {
+        if (!hasPermission(context)) return null
+        val manager = context.getSystemService(LocationManager::class.java) ?: return null
+        val enabled = { p: String -> runCatching { manager.isProviderEnabled(p) }.getOrDefault(false) }
+        val lastKnown = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+            .filter(enabled)
+            .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+        if (lastKnown != null && System.currentTimeMillis() - lastKnown.time < maxAgeMs) return lastKnown
+        val fresh = buildList {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+            if (hasPrecise(context)) add(LocationManager.GPS_PROVIDER)
+        }.filter(enabled)
+        for (provider in fresh) {
+            val fix = withTimeoutOrNull(if (provider == LocationManager.GPS_PROVIDER) gpsTimeoutMs else 10_000L) {
+                suspendCancellableCoroutine<Location?> { cont ->
+                    val signal = android.os.CancellationSignal()
+                    cont.invokeOnCancellation { signal.cancel() }
+                    runCatching {
+                        LocationManagerCompat.getCurrentLocation(manager, provider, signal, ContextCompat.getMainExecutor(context)) { location ->
+                            if (cont.isActive) cont.resume(location)
+                        }
+                    }.onFailure { if (cont.isActive) cont.resume(null) }
+                }
+            }
+            if (fix != null) return fix
+        }
+        return if (fallbackToLastKnown) lastKnown else null
+    }
+}

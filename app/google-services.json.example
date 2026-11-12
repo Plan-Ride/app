@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "FILL_IN",
+    "project_id": "FILL_IN",
+    "storage_bucket": "FILL_IN"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "FILL_IN",
+        "android_client_info": {
+          "package_name": "com.ksjd.testem"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "FILL_IN"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
