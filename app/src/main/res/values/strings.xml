@@ -382,8 +382,8 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="history_saturdays">Saturdays</string>
     <string name="history_sundays">Sundays</string>
     <string name="history_estimate">(estimate from past days)</string>
-    <string name="predict_switch">Use past delays for times</string>
-    <string name="predict_switch_hint">When nothing live is known about a bus, shift each stop\'s time by how late the bus usually is there. Off: shown only as a hint.</string>
+    <string name="predict_switch">Show the usual delay</string>
+    <string name="predict_switch_hint">When nothing live is known about a bus, the card and the widget say how late it usually is. Its times stay the timetable\'s.</string>
     <string name="journey_follow">Follow the whole journey</string>
     <string name="journey_add">Add to my journey</string>
     <string name="journey_pick_alight">Tap the stop where you change or get off, then add the next bus the same way.</string>
@@ -814,4 +814,11 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="follow_battery_later">Not now</string>
     <string name="notice_hide">Hide this notice</string>
     <string name="notice_lines">Lines %1$s</string>
+    <string name="fare_from">from %1$s</string>
+    <string name="fare_short">Your %1$s credit (%2$s) won\'t cover this journey (%3$s). Top up before you board.</string>
+    <string name="pay_bank_title">Paying by bank card</string>
+    <string name="pay_bank_city">City buses</string>
+    <string name="pay_bank_city_hint">I pay city buses with a bank card: no low-credit warnings for them</string>
+    <string name="pay_bank_region">Regional buses</string>
+    <string name="pay_bank_region_hint">I pay buses between towns with a bank card: no low-credit warnings for them</string>
 </resources>

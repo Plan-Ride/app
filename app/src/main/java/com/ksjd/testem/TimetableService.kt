@@ -306,7 +306,9 @@ class TimetableService {
                 serviceDate = Instant.ofEpochMilli(l.get("departure").asLong).atZone(SK_ZONE).toLocalDate().toString(),
                 transferWorked = l.getAsJsonObject("transfer")?.get("worked")?.asInt ?: 0,
                 transferRuns = l.getAsJsonObject("transfer")?.get("runs")?.asInt ?: 0,
-                goesOnAs = l.getAsJsonArray("continues")?.map { it.asJsonObject.let { x -> x.str("line") to x.str("stop") } }?.ifEmpty { null }
+                goesOnAs = l.getAsJsonArray("continues")?.map { it.asJsonObject.let { x -> x.str("line") to x.str("stop") } }?.ifEmpty { null },
+                tariff = l.str("tariff").ifBlank { null },
+                units = l.get("units")?.takeIf { it.isJsonPrimitive }?.asInt
             )
         }
         val minutes = ((c.get("arrival").asLong - c.get("departure").asLong) / 60_000L).toInt()

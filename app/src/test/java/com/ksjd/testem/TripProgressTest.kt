@@ -82,4 +82,13 @@ class TripProgressTest {
         assertEquals("S3", riding(t0 + 60 * min, 2.0f, standingAt = 2).nextStopName)
         assertEquals("S2", riding(t0 + 60 * min, 2.0f, standingAt = 2).currentStopName)
     }
+
+    @Test
+    fun waitingAtTheirStopTheRiderDoesNotPutTheBusThere() {
+        // EM-0107: the bus is due at S0 in 5 min; the phone stands at S1, where the rider gets on.
+        val waiting = TripProgress.from(TripDetail("2", "S3", stops, null), trip, t0 - 5 * min, standingAt = 1)
+        assertEquals(0, waiting.shownNextIndex)
+        // Once the bus is due there, the stop is "now" as before.
+        assertEquals("S1", TripProgress.from(TripDetail("2", "S3", stops, null), trip, t0 + 35 * min - 20_000, standingAt = 1).currentStopName)
+    }
 }

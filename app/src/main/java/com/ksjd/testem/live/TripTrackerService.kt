@@ -273,7 +273,10 @@ object TripTracking {
     /** A journey the user is putting together bus by bus (when the planner finds no connection). */
     private val _draft = MutableStateFlow<List<DraftLeg>>(emptyList())
     val draft: StateFlow<List<DraftLeg>> = _draft
-    fun addToDraft(leg: DraftLeg) { _draft.value = _draft.value.filter { it.trip.ref != leg.trip.ref } + leg }
+    /** In the order the buses leave, whatever order they were added in: the later bus (B to C) can be picked first. */
+    fun addToDraft(leg: DraftLeg) {
+        _draft.value = (_draft.value.filter { it.trip.ref != leg.trip.ref } + leg).sortedBy { it.trip.departsAtMs }
+    }
     fun clearDraft() { _draft.value = emptyList() }
 
     /** Follows [legs] as one journey: each bus until its stop, then the next one. */
@@ -1591,7 +1594,9 @@ data class TripProgress(
             // The stop the bus is at (only for the "now" and "next" names; alerts keep going by nextIndex).
             // A stop counts as left once the phone is clearly past it (a tenth of the way to the next one).
             val riderNext = riderIndex?.let { r -> (if (r - floor(r) > 0.1f) floor(r).toInt() + 1 else floor(r).toInt()).coerceIn(0, stops.size) }
-            val atIndex = standingAt?.takeIf { it in stops.indices && it >= (riderNext ?: nextIndex) - 1 }
+            // EM-0107: only where the bus can be. The phone also stands at the rider's own stop while they wait there, and
+            // the list drew the bus as already past it, 5 stops before it came.
+            val atIndex = standingAt?.takeIf { it in stops.indices && it >= (riderNext ?: nextIndex) - 1 && it <= (riderNext ?: nextIndex) }
                 ?: nextIndex.takeIf { riderNext == null && it < stops.size && now >= expected[it] - AT_STOP_LEAD_MS }
             val shownNext = if (atIndex != null) atIndex + 1 else riderNext ?: nextIndex
             val nextMs = expected.getOrNull(shownNext) ?: expected.lastOrNull() ?: now

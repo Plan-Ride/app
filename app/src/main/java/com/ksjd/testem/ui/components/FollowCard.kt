@@ -388,6 +388,11 @@ fun followSummary(context: android.content.Context, view: FollowView, now: Long)
     val target = if (p.onBoard) p.nextExpectedMs else p.boardingExpectedMs
     val minutes = ceil((target - now) / 60_000.0).toInt()
     val delay = view.detail.delaySeconds?.let { Math.round(it / 60.0).toInt() }
+    // EM-0107: nothing live known: how late the bus usually is, said as "Usually ~4 min late" (when the rider wants it),
+    // never as "+4 min late". The times and the countdown stay the timetable's.
+    val usual = view.detail.delaySeconds == null && view.detail.positionSource == com.ksjd.testem.live.PositionSource.Timetable &&
+        com.ksjd.testem.CredentialsManager(context).getPredictShift()
+    val usually = view.detail.history?.takeIf { usual }?.let { Format.history(context, it, it.now(view.detail)).substringBefore(" (") }
     val last = (view.detail.stops.size - 1).coerceAtLeast(1)
     val start = (p.boardingIndex ?: 0).coerceIn(0, last - 1)
     val end = (p.alightIndex ?: last).coerceIn(start + 1, last)
@@ -405,7 +410,7 @@ fun followSummary(context: android.content.Context, view: FollowView, now: Long)
                 m <= -1 -> context.getString(R.string.delay_early, -m)
                 else -> context.getString(R.string.delay_on_time)
             }
-        },
+        } ?: usually,
         veryLate = (delay ?: 0) >= 3,
         stopsAway = ceil(start - p.position).toInt().coerceAtLeast(0),
         hops = end - start,

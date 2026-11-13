@@ -66,7 +66,7 @@ object Reminders {
         val prefs = CredentialsManager(context)
         val now = System.currentTimeMillis()
         snapshot.cards.filter { it.snr.isNotBlank() }.forEach { card ->
-            if (prefs.getLowCreditAlertsEnabled()) {
+            if (prefs.getLowCreditAlertsEnabled() && !prefs.getBankCardCity()) {
                 val credit = card.creditLastBalance
                 val threshold = prefs.getLowCreditWarningThreshold()
                 val key = "credit-${card.snr}"

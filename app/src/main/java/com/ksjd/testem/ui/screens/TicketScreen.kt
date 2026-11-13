@@ -220,7 +220,10 @@ fun TicketScreen(
             }
             // Low credit, with a way to add some right away (SAD Zvolen's top-up; IDS BBSK's in its e-shop).
             val credit = card?.creditLastBalance
-            if (credit != null && credit < app.lowCreditWarningThreshold) {
+            // 2.18.0: not for buses the rider pays with a bank card (Reminders settings): the credit isn't used there.
+            val payContext = androidx.compose.ui.platform.LocalContext.current
+            val payPrefs = remember { com.ksjd.testem.CredentialsManager(payContext) }
+            if (credit != null && credit < app.lowCreditWarningThreshold && !payPrefs.getBankCardCity()) {
                 Notice(
                     stringResource(R.string.low_credit_message, Format.money(credit, card.currencySymbol)),
                     tone = NoticeTone.Warning,
@@ -229,7 +232,9 @@ fun TicketScreen(
                 )
             }
             val idsCredit = ids.account?.credit
-            if (unlocked && shown == Wallet.IDS && idsCredit != null && idsCredit < app.lowCreditWarningThreshold) {
+            // Riding on a valid pass (a monthly or yearly ticket), the few cents of credit left beside it are no warning.
+            val idsPass = ids.account?.tickets.orEmpty().any { it.valid && it.validToMs > System.currentTimeMillis() }
+            if (unlocked && shown == Wallet.IDS && !idsPass && !payPrefs.getBankCardRegion() && idsCredit != null && idsCredit < app.lowCreditWarningThreshold) {
                 val context = androidx.compose.ui.platform.LocalContext.current
                 Notice(
                     stringResource(R.string.low_credit_message, Format.money(idsCredit, "€")),

@@ -368,8 +368,15 @@ class CredentialsManager(context: Context) {
     fun saveCatchEnabled(enabled: Boolean) = prefs.edit().putBoolean("catch_enabled", enabled).apply()
 
     /** Alert on timetable times too, not only when the bus's real position is known. */
-    /** No live data: shift the timetable by how late the trip usually is (else only a hint). */
-    /** 2.17.2: on unless the rider turned it off (each stop by how late it usually is there). */
+    /** No live data: the follow card says how late the trip usually is (EM-0107: the times are never shifted by it). */
+    /** 2.18.0: emHUB's price lists as last read (JSON), and when. */
+    fun getFares(): Pair<String, Long>? = prefs.getString("fares_json", null)?.let { it to prefs.getLong("fares_at", 0L) }
+    fun saveFares(json: String) = prefs.edit().putString("fares_json", json).putLong("fares_at", System.currentTimeMillis()).apply()
+    /** The rider pays these buses with a bank card, not the credit: no "credit won't cover it" for them. */
+    fun getBankCardCity(): Boolean = prefs.getBoolean("pay_bank_city", false)
+    fun saveBankCardCity(on: Boolean) = prefs.edit().putBoolean("pay_bank_city", on).apply()
+    fun getBankCardRegion(): Boolean = prefs.getBoolean("pay_bank_region", false)
+    fun saveBankCardRegion(on: Boolean) = prefs.edit().putBoolean("pay_bank_region", on).apply()
     fun getPredictShift(): Boolean = prefs.getBoolean("predict_shift", true)
     /** EM-0078: the rider said "Not now" to the battery prompt on the follow card. */
     fun getBatteryPromptHidden(): Boolean = prefs.getBoolean("battery_prompt_hidden", false)

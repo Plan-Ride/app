@@ -530,7 +530,8 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else {
+                    } else if (trip.detail?.positionSource != PositionSource.History) {
+                        // EM-0107: a usual delay is said once, as "Usually ...", in the line below.
                         DelayLabel(trip.detail?.delaySeconds)
                     }
                     val history = trip.detail?.history

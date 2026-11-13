@@ -275,11 +275,9 @@ class LiveRepository(context: Context) {
         val (community, history, crowd) = runCatching { com.ksjd.testem.hub.HubClient.communityDelay(key) }.getOrNull()
             ?: return detail
         detail = detail.copy(history = history, crowd = crowd)
-        if (community == null) {
-            val shift = history != null && prefs.getPredictShift() && detail.positionSource == PositionSource.Timetable
-            // 2.17.2: each stop by how late it usually is there; the one figure is where the bus is now.
-            return if (shift) detail.copy(delaySeconds = history!!.now(detail), positionSource = PositionSource.History) else detail
-        }
+        // EM-0107: nobody knows where the bus is, so the times stay the timetable's. How late it usually is goes along
+        // as a hint only (2.17.2 shifted every stop by it, which read as a real delay).
+        if (community == null) return detail
         return when {
             community.isFreshGps -> detail.copy(delaySeconds = community.delaySeconds, community = community, positionSource = PositionSource.RiderGps)
             // Taps correct the timetable or sadzv's delay, but not a live GPS position.

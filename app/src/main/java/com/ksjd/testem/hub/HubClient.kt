@@ -306,6 +306,11 @@ object HubClient {
     }
 
     /** The service notices showing now (emHUB's Notices page). */
+    /** 2.18.0: the carriers' price lists as emHUB keeps them (see Fares), as the JSON it sends. */
+    suspend fun fares(): String = withContext(Dispatchers.IO) {
+        execute(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/fares").get()).toString()
+    }
+
     suspend fun notices(): List<ServiceNotice> = withContext(Dispatchers.IO) {
         val root = execute(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/notices").get())
         root.getAsJsonArray("notices")?.map { it.asJsonObject }?.map { n ->

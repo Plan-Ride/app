@@ -284,6 +284,7 @@ private fun MainScaffold(
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
         ) {
+            val tabStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
             val openStopFromPlanner: (String, String, String) -> Unit = { stopName, line, time ->
                 selected = AppTab.Departures
                 liveViewModel.openStopByName(
@@ -292,25 +293,29 @@ private fun MainScaffold(
                     onNotFound = { liveViewModel.search(stopName.substringAfterLast(",").trim()) }
                 )
             }
-            when (selected) {
-                AppTab.Home -> TicketScreen(
-                    viewModel = viewModel,
-                    liveViewModel = liveViewModel,
-                    activity = activity,
-                    onUnlock = requestUnlock,
-                    onSignIn = onSignIn,
-                    onOpenDepartures = { selected = AppTab.Departures },
-                    onOpenPlanner = { selected = AppTab.Planner },
-                    onOpenAccount = { selected = AppTab.Account }
-                )
-                AppTab.Departures -> DeparturesScreen(liveViewModel = liveViewModel)
-                AppTab.Planner -> PlannerScreen(
-                    viewModel = viewModel,
-                    onOpenStop = openStopFromPlanner,
-                    onOpenTrip = liveViewModel::openScheduledTrip
-                )
-                AppTab.History -> if (appState.isAppUnlocked) HistoryScreen(viewModel = viewModel) else LockedScreen(requestUnlock)
-                AppTab.Account -> AccountScreen(viewModel = viewModel, onUnlock = requestUnlock, onSignIn = onSignIn)
+            // Each tab keeps what it remembers (how far it is scrolled, the settings page that is open) while the app is
+            // open: coming back to a tab it is where it was left, not at the top.
+            tabStates.SaveableStateProvider(selected) {
+                when (selected) {
+                    AppTab.Home -> TicketScreen(
+                        viewModel = viewModel,
+                        liveViewModel = liveViewModel,
+                        activity = activity,
+                        onUnlock = requestUnlock,
+                        onSignIn = onSignIn,
+                        onOpenDepartures = { selected = AppTab.Departures },
+                        onOpenPlanner = { selected = AppTab.Planner },
+                        onOpenAccount = { selected = AppTab.Account }
+                    )
+                    AppTab.Departures -> DeparturesScreen(liveViewModel = liveViewModel)
+                    AppTab.Planner -> PlannerScreen(
+                        viewModel = viewModel,
+                        onOpenStop = openStopFromPlanner,
+                        onOpenTrip = liveViewModel::openScheduledTrip
+                    )
+                    AppTab.History -> if (appState.isAppUnlocked) HistoryScreen(viewModel = viewModel) else LockedScreen(requestUnlock)
+                    AppTab.Account -> AccountScreen(viewModel = viewModel, onUnlock = requestUnlock, onSignIn = onSignIn)
+                }
             }
             // First run: ask about the two opt-in features (community delays, catch estimate).
             val context = androidx.compose.ui.platform.LocalContext.current

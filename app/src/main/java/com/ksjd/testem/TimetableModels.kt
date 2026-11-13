@@ -36,7 +36,10 @@ data class TimetableSegment(
     val transferWorked: Int = 0,
     val transferRuns: Int = 0,
     /** 2.17.2: where the bus goes on as another line, riders staying on: (line, stop). Null when it doesn't (and in older saved copies). */
-    val goesOnAs: List<Pair<String, String>>? = null
+    val goesOnAs: List<Pair<String, String>>? = null,
+    /** 2.18.0: the price list this bus goes by (emHUB's fares) and, for IDS BBSK, the tariff units of this ride. Null: no price known. */
+    val tariff: String? = null,
+    val units: Int? = null
 )
 
 data class TimetableConnection(

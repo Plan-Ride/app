@@ -394,8 +394,8 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="history_saturdays">sobôt</string>
     <string name="history_sundays">nedieľ</string>
     <string name="history_estimate">(odhad z minulých dní)</string>
-    <string name="predict_switch">Časy podľa minulých meškaní</string>
-    <string name="predict_switch_hint">Keď o autobuse nie je nič známe naživo, posunie čas každej zastávky o to, koľko tam autobus zvyčajne mešká. Vypnuté: len ako tip.</string>
+    <string name="predict_switch">Zobraziť obvyklé meškanie</string>
+    <string name="predict_switch_hint">Keď o autobuse nie je nič známe naživo, karta a widget ukážu, o koľko zvyčajne mešká. Časy ostávajú podľa cestovného poriadku.</string>
     <string name="journey_follow">Sledovať celú cestu</string>
     <string name="journey_add">Pridať do mojej cesty</string>
     <string name="journey_pick_alight">Ťuknite na zastávku, kde prestupujete alebo vystupujete, a potom rovnako pridajte ďalší autobus.</string>
@@ -826,4 +826,11 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_exact_allow">Povoliť spustenie načas</string>
     <string name="notice_hide">Skryť oznam</string>
     <string name="notice_lines">Linky %1$s</string>
+    <string name="fare_from">od %1$s</string>
+    <string name="fare_short">Kredit %1$s (%2$s) na túto cestu nestačí (%3$s). Dobite si ho pred nástupom.</string>
+    <string name="pay_bank_title">Platba bankovou kartou</string>
+    <string name="pay_bank_city">Mestské autobusy</string>
+    <string name="pay_bank_city_hint">V MHD platím bankovou kartou: bez upozornení na nízky kredit</string>
+    <string name="pay_bank_region">Prímestské autobusy</string>
+    <string name="pay_bank_region_hint">Medzi obcami platím bankovou kartou: bez upozornení na nízky kredit</string>
 </resources>

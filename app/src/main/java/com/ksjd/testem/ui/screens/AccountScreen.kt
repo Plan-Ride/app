@@ -107,6 +107,8 @@ fun AccountScreen(viewModel: AppViewModel, onUnlock: () -> Unit, onSignIn: (Wall
     LaunchedEffect(reportRequested) {
         if (reportRequested) { page = SettingsPage.BugReport; com.ksjd.testem.hub.AppLogs.reportRequested.value = false }
     }
+    // Kept here, above the pages: coming back from one (a misclick on "Report a bug") the list is where it was, not at the top.
+    val overviewScroll = rememberScrollState()
     val current = page
     // Pages behind the PIN close when the app locks.
     if (current != null && current in LOCKED_PAGES && !(app.anyAccount && app.isAppUnlocked)) page = null
@@ -115,14 +117,15 @@ fun AccountScreen(viewModel: AppViewModel, onUnlock: () -> Unit, onSignIn: (Wall
         SettingsPageScreen(current, viewModel, onBack = { page = null })
         return
     }
-    AccountOverview(viewModel, onUnlock, onSignIn, onOpen = { page = it })
+    AccountOverview(viewModel, onUnlock, onSignIn, overviewScroll, onOpen = { page = it })
 }
 
 /** Security (PIN) and Developer (raw token) need the account unlocked. */
 private val LOCKED_PAGES = setOf(SettingsPage.Security, SettingsPage.Developer)
 
 @Composable
-private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSignIn: (Wallet) -> Unit, onOpen: (SettingsPage) -> Unit) {
+private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSignIn: (Wallet) -> Unit,
+                            scroll: androidx.compose.foundation.ScrollState, onOpen: (SettingsPage) -> Unit) {
     val ticket by viewModel.ticketState.collectAsState()
     val app by viewModel.appState.collectAsState()
     var confirmRemove by remember { mutableStateOf(false) }
@@ -166,7 +169,7 @@ private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSig
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(bottom = com.ksjd.testem.ui.components.barSpace())
     ) {
         ScreenHeader(
@@ -652,6 +655,18 @@ private fun ReminderSettings(app: AppState, viewModel: AppViewModel) {
 
     var thresholdText by rememberSaveable { mutableStateOf("%.2f".format(app.lowCreditWarningThreshold)) }
 
+    // 2.18.0: buses paid with a bank card: no "credit won't cover it" in the planner and no low-credit notice for them.
+    if (app.anyAccount) {
+        val farePrefs = remember { com.ksjd.testem.CredentialsManager(context) }
+        var bankCity by remember { mutableStateOf(farePrefs.getBankCardCity()) }
+        var bankRegion by remember { mutableStateOf(farePrefs.getBankCardRegion()) }
+        SectionLabel(stringResource(R.string.pay_bank_title))
+        ListGroup {
+            SwitchRow(stringResource(R.string.pay_bank_city), stringResource(R.string.pay_bank_city_hint), bankCity) { bankCity = it; farePrefs.saveBankCardCity(it) }
+            GroupDivider()
+            SwitchRow(stringResource(R.string.pay_bank_region), stringResource(R.string.pay_bank_region_hint), bankRegion) { bankRegion = it; farePrefs.saveBankCardRegion(it) }
+        }
+    }
     // Credit and expiry come from the account; without one only the bus alerts apply.
     if (!app.hasAccount) {
         ArrivalAlertSetting()

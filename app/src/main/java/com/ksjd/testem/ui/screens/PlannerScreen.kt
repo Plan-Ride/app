@@ -121,6 +121,12 @@ fun PlannerScreen(
     val state by viewModel.timetableState.collectAsState()
     val listState = rememberLazyListState()
     LaunchedEffect(Unit) { viewModel.warmHub() }
+    // 2.18.0: what each connection costs, and a warning when the credit won't cover it.
+    val fareContext = LocalContext.current
+    val tariffs by com.ksjd.testem.Fares.tariffs.collectAsState()
+    val fareTicket by viewModel.ticketState.collectAsState()
+    val fareIds by viewModel.idsState.collectAsState()
+    LaunchedEffect(Unit) { com.ksjd.testem.Fares.refresh(fareContext) }
     // A regular ride being edited (new ones come from a result's Repeat button).
     var editing by remember { mutableStateOf<Pair<RecurringRide, Boolean>?>(null) }
     editing?.let { (ride, isNew) ->
@@ -184,6 +190,9 @@ fun PlannerScreen(
             items(state.connections, key = { it.id }) { connection ->
                 ConnectionCard(
                     connection = connection,
+                    fare = remember(connection, tariffs, fareTicket.selectedCard, fareIds.account) {
+                        fareNote(fareContext, tariffs, connection, fareTicket.selectedCard, fareIds.account)
+                    },
                     saved = state.savedJourneys.any { it.sameAs(connection) },
                     onToggleSave = { viewModel.toggleSaveJourney(connection) },
                     onRepeat = { viewModel.rideFrom(connection)?.let { editing = it to true } },
@@ -562,6 +571,8 @@ private fun routeLabel(route: SavedRoute): String = "${readableStop(route.fromTe
 @Composable
 private fun ConnectionCard(
     connection: TimetableConnection,
+    /** What it costs with the transport cards, and a warning when a credit won't cover it (either may be null). */
+    fare: Pair<String?, String?>,
     saved: Boolean,
     onToggleSave: () -> Unit,
     onRepeat: () -> Unit,
@@ -596,7 +607,10 @@ private fun ConnectionCard(
                     style = TimeStyle.copy(fontSize = MaterialTheme.typography.headlineSmall.fontSize),
                     modifier = Modifier.weight(1f)
                 )
-                Text(connection.totalDuration, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(connection.totalDuration, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    fare.first?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
                 // Star: keep it on the home tab. Repeat: follow it by itself on chosen days.
                 IconButton(onClick = onToggleSave) {
                     Icon(
@@ -615,6 +629,7 @@ private fun ConnectionCard(
                     Icon(Icons.Outlined.Share, shareTitle, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            fare.second?.let { Notice(it, tone = NoticeTone.Warning, modifier = Modifier.padding(end = 12.dp, bottom = 6.dp)) }
             connection.segments.forEachIndexed { index, segment ->
                 if (index > 0) {
                     Row(Modifier.padding(start = 52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -773,3 +788,35 @@ private fun shareText(connection: TimetableConnection): String = buildString {
         append("${s.line}: ${s.departureTime} ${s.departureStop} → ${s.arrivalTime} ${s.arrivalStop}\n")
     }
 }.trim()
+
+/**
+ * 2.18.0: (the journey's price with the transport cards, a warning when a credit won't cover it). The rider's category
+ * and season tickets come from the accounts; buses paid by bank card (Reminders settings) give no warning.
+ */
+private fun fareNote(
+    context: android.content.Context, tariffs: Map<String, com.ksjd.testem.Tariff>?, connection: TimetableConnection,
+    card: com.ksjd.testem.AccountDetails?, ids: com.ksjd.testem.IdsAccount?
+): Pair<String?, String?> {
+    if (tariffs == null) return null to null
+    val now = System.currentTimeMillis()
+    val passes = ids?.tickets.orEmpty().filter { it.valid && it.validToMs > now }
+    val cityPass = card?.ticketValidTo?.let { (if (it < 10_000_000_000L) it * 1000L else it) > now } == true
+    val category = com.ksjd.testem.Fares.category(listOfNotNull(card?.cardTypeName) + ids?.tickets.orEmpty().map { it.name })
+    // ponytail: any valid IDS BBSK season ticket counts as covering the regional buses (a Sieťovka does; a Časovka
+    // only its zones, which the e-shop page doesn't list), and a valid SAD Zvolen one as covering both cities.
+    val cost = com.ksjd.testem.Fares.cost(tariffs, connection.segments, category, cityPass, passes.isNotEmpty())
+    val price = when {
+        cost.totalCents == 0 -> null
+        cost.unknown -> context.getString(R.string.fare_from, com.ksjd.testem.ui.Format.money(cost.totalCents / 100.0))
+        else -> com.ksjd.testem.ui.Format.money(cost.totalCents / 100.0)
+    }
+    val prefs = com.ksjd.testem.CredentialsManager(context)
+    fun short(name: Int, credit: Double?, cents: Int, bankCard: Boolean): String? =
+        if (!bankCard && credit != null && cents > Math.round(credit * 100)) context.getString(R.string.fare_short, context.getString(name),
+            com.ksjd.testem.ui.Format.money(credit), com.ksjd.testem.ui.Format.money(cents / 100.0)) else null
+    val warning = listOfNotNull(
+        short(R.string.wallet_sadzv, card?.creditLastBalance, cost.sadzvCents, prefs.getBankCardCity()),
+        short(R.string.wallet_ids, ids?.credit, cost.idsCents, prefs.getBankCardRegion())
+    ).joinToString("\n").ifBlank { null }
+    return price to warning
+}
