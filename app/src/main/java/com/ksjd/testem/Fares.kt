@@ -32,7 +32,8 @@ data class Tariff(
 }
 
 /** What a journey takes from each credit. [unknown]: a bus on it has no price, so the sums are a minimum. */
-data class JourneyCost(val sadzvCents: Int, val idsCents: Int, val unknown: Boolean) {
+data class JourneyCost(val sadzvCents: Int, val idsCents: Int, val unknown: Boolean, val train: Boolean = false,
+                       /** A bus on it is covered by a valid season ticket. */ val covered: Boolean = false) {
     val totalCents: Int get() = sadzvCents + idsCents
 }
 
@@ -98,6 +99,8 @@ object Fares {
         var sadzv = 0
         var ids = 0
         var unknown = false
+        var train = false
+        var covered = false
         var ticket: Triple<String, Int, Boolean>? = null   // city ticket: tariff, minute it was bought, a change already used
         var units = 0                                      // IDS BBSK buses one after another ride on one ticket
         var region: Tariff? = null
@@ -110,6 +113,12 @@ object Fares {
             units = 0
         }
         segments.forEach { s ->
+            if (s.group == "rail") {
+                // 2.18.0: train fares aren't in emHUB's price lists: the price is the buses', "+ train".
+                closeRegion()
+                train = true
+                return@forEach
+            }
             val tariff = s.tariff?.let { tariffs[it] }
             // SAD Zvolen's long-distance lines (not 060xxx) aren't IDS BBSK, whatever emHUB guessed from the operator.
             val known = tariff != null && (tariff.flat || WalletRule.forLine(s.line, s.operatorName) == Wallet.IDS)
@@ -120,7 +129,7 @@ object Fares {
             }
             tariff!!
             if (!tariff.flat) {
-                if (regionPass) return@forEach
+                if (regionPass) { covered = true; return@forEach }
                 if (tariff.columns[category] != "special" && s.units == null) unknown = true
                 if (region != null && region!!.id != tariff.id) closeRegion()
                 region = tariff
@@ -128,7 +137,7 @@ object Fares {
                 return@forEach
             }
             closeRegion()
-            if (cityPass) return@forEach
+            if (cityPass) { covered = true; return@forEach }
             val at = minuteOfDay(s.departureTime)
             val held = ticket?.takeIf { (id, since, used) ->
                 id == tariff.id && tariff.transferMinutes > 0 && (at - since + 1440) % 1440 <= tariff.transferMinutes &&
@@ -143,7 +152,7 @@ object Fares {
             }
         }
         closeRegion()
-        return JourneyCost(sadzv, ids, unknown)
+        return JourneyCost(sadzv, ids, unknown, train, covered)
     }
 
     private fun minuteOfDay(clock: String): Int =

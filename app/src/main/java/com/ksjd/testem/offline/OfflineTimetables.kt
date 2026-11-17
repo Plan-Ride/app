@@ -38,8 +38,11 @@ object OfflineTimetables {
         val stops: Array<IntArray>, val times: Array<IntArray>, val days: IntArray,
         /** 2.17.2: trip -> (the trip whose bus goes on as it, riders staying on; on which days, as in [days]). */
         val continuesFrom: Map<Int, List<Pair<Int, Int>>> = emptyMap(),
-        val lats: DoubleArray = DoubleArray(0), val lons: DoubleArray = DoubleArray(0)
+        val lats: DoubleArray = DoubleArray(0), val lons: DoubleArray = DoubleArray(0),
+        /** 2.18.0: each trip's kind of transport ("bus", "city", "rail"); packs from before trains have none (all "bus"). */
+        val modes: Array<String> = emptyArray()
     ) {
+        fun group(trip: Int) = modes.getOrElse(trip) { "bus" }
         /** EM-0098: the station names folded for matching what's typed. */
         val folded: List<List<String>> by lazy { names.map { fold(it).split(' ') } }
         /** Each station's trips: (trip, its stop number there). */
@@ -121,6 +124,7 @@ object OfflineTimetables {
         val lines = ArrayList<String>(); val heads = ArrayList<String>(); val ops = ArrayList<String>()
         val stops = ArrayList<IntArray>(); val times = ArrayList<IntArray>(); val days = ArrayList<Int>()
         val continuesFrom = HashMap<Int, MutableList<Pair<Int, Int>>>()
+        val modes = ArrayList<String>()
         fun ints(): IntArray { val out = ArrayList<Int>(); r.beginArray(); while (r.hasNext()) out.add(r.nextInt()); r.endArray(); return out.toIntArray() }
         r.beginObject()
         while (r.hasNext()) {
@@ -149,12 +153,14 @@ object OfflineTimetables {
                     }
                     r.endArray()
                 }
+                "modes" -> { r.beginArray(); while (r.hasNext()) modes.add(r.nextString()); r.endArray() }
                 else -> r.skipValue()
             }
         }
         r.endObject()
         Pack(version, from, ids.toTypedArray(), names.toTypedArray(), lines.toTypedArray(), heads.toTypedArray(), ops.toTypedArray(),
-            stops.toTypedArray(), times.toTypedArray(), days.toIntArray(), continuesFrom, lats.toDoubleArray(), lons.toDoubleArray())
+            stops.toTypedArray(), times.toTypedArray(), days.toIntArray(), continuesFrom, lats.toDoubleArray(), lons.toDoubleArray(),
+            modes.toTypedArray())
     }
 
     private fun fold(s: String) = Normalizer.normalize(s, Normalizer.Form.NFD).replace(Regex("\\p{M}"), "").lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
@@ -229,17 +235,18 @@ object OfflineTimetables {
     /** Every stop-to-stop hop of [day] and the day after, by departure: (departure s, arrival s, trip, its stop number, day 0/1). */
     private class Hops(val dep: LongArray, val arr: LongArray, val trip: IntArray, val k: IntArray, val day: IntArray, val first: LocalDate)
 
-    private val hopsCache = HashMap<Pair<Pack, LocalDate>, Hops>()
+    private val hopsCache = HashMap<Triple<Pack, LocalDate, Set<String>>, Hops>()
 
     private fun hops(p: Pack, day: LocalDate): Hops = synchronized(hopsCache) {
-        hopsCache.getOrPut(p to day) {
+        val allowed = com.ksjd.testem.TransportModes.planner
+        hopsCache.getOrPut(Triple(p, day, allowed)) {
             hopsCache.clear() // ponytail: one day's hops kept (a few MB); per region and day if people switch a lot
             val rows = ArrayList<LongArray>()
             for (d in 0..1) {
                 val date = day.plusDays(d.toLong())
                 val base = date.atStartOfDay(SK_ZONE).toEpochSecond()
                 for (t in p.stops.indices) {
-                    if (!p.runs(t, date)) continue
+                    if (!p.runs(t, date) || p.group(t) !in allowed) continue
                     val times = p.times[t]
                     for (k in 0 until times.size - 1) rows.add(longArrayOf(base + times[k], base + times[k + 1], t.toLong(), k.toLong(), d.toLong()))
                 }
@@ -301,7 +308,8 @@ object OfflineTimetables {
             val goesOn = generateSequence(l.offTrip) { t -> p.cameFrom(t, l.date)?.takeIf { t != l.trip } }.take(8)
                 .takeWhile { it != l.trip }.map { t -> p.lines[t] to p.names[p.stops[t][0]] }.toList().reversed()
             TimetableSegment(
-                line = if (line.any { it.isLetter() } && line.contains(' ')) line else "Bus $line",
+                line = if (p.group(l.trip) == "rail" || line.any { it.isLetter() } && line.contains(' ')) line else "Bus $line",
+                group = p.group(l.trip), vehicle = if (p.group(l.trip) == "rail") "rail" else "bus",
                 operatorName = p.operators[l.trip],
                 departureTime = clock(departure(p, l)), departureStop = p.names[p.stops[l.trip][l.on]],
                 arrivalTime = clock(arrival(p, l)), arrivalStop = p.names[p.stops[l.offTrip][l.off]],

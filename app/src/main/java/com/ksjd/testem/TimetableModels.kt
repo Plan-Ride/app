@@ -9,7 +9,10 @@ data class CpStopSuggestion(
     val value2: String,
     val coorX: String? = null,
     val coorY: String? = null,
-    val description: String = ""
+    val description: String = "",
+    /** 2.18.0: the kinds of transport stopping there ("bus", "city", "rail"), and whether it is a whole town. */
+    val modes: List<String> = emptyList(),
+    val town: Boolean = false
 ) {
     fun toHiddenFieldValue(): String = "$selectedText%$value%$value2"
     fun toPositionFieldValue(): String = if (!coorX.isNullOrBlank() && !coorY.isNullOrBlank()) {
@@ -39,8 +42,14 @@ data class TimetableSegment(
     val goesOnAs: List<Pair<String, String>>? = null,
     /** 2.18.0: the price list this bus goes by (emHUB's fares) and, for IDS BBSK, the tariff units of this ride. Null: no price known. */
     val tariff: String? = null,
-    val units: Int? = null
+    val units: Int? = null,
+    /** 2.18.0: "bus" (between towns), "city" (city transport) or "rail"; and the vehicle ("bus", "tram", "trolleybus", "rail"). */
+    val group: String = "bus",
+    val vehicle: String = "bus"
 )
+
+/** A walk on a connection: to [stop], [minutes] long, arriving there at [arrivalTime]. */
+data class Walk(val stop: String, val minutes: Int, val arrivalTime: String)
 
 data class TimetableConnection(
     val id: String,
@@ -49,7 +58,10 @@ data class TimetableConnection(
     val totalDuration: String,
     val segments: List<TimetableSegment>,
     /** Minutes on foot within the connection (to another stop, between changes): fewer first when it rains. */
-    val walkMinutes: Int = 0
+    val walkMinutes: Int = 0,
+    /** 2.18.0: a walk before the first bus (to its stop) and after the last one (to where the search ends): (stop, minutes, at). */
+    val walkBefore: Walk? = null,
+    val walkAfter: Walk? = null
 ) {
     val isDirect: Boolean
         get() = segments.size <= 1

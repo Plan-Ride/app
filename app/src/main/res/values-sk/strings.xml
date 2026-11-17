@@ -117,7 +117,7 @@
 
     <!-- Trasa -->
     <string name="planner_title">Trasa</string>
-    <string name="planner_subtitle">Regionálne a diaľkové autobusy</string>
+    <string name="planner_subtitle">Autobusy, vlaky a MHD</string>
     <string name="planner_swap">Vymeniť odkiaľ a kam</string>
     <string name="planner_now">Teraz</string>
     <string name="planner_pick_time">Zvoliť čas</string>
@@ -284,7 +284,7 @@
     <string name="track_arrived_body">Autobus dorazil na zastávku %1$s. Sledovanie skončilo.</string>
     <string name="track_channel_live">Sledovaný spoj</string>
     <string name="track_channel_alerts">Upozornenia na spoj</string>
-    <string name="track_schedule_only">Časy podľa cestovného poriadku, bez polohy autobusu</string>
+    <string name="track_schedule_only">Časy podľa cestovného poriadku, bez živej polohy</string>
     <string name="planner_show_stops">Zobraziť všetky zastávky</string>
     <string name="community_bus_here">Autobus je tu</string>
     <string name="community_at">Na %1$s</string>
@@ -559,7 +559,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_battery_needed">Sledovanie sa môže zastaviť, keď telefón Plan&amp;Ride na pozadí uspí. V nastaveniach aplikácie nastavte Batériu na Neobmedzené.</string>
     <string name="follow_battery_open">Otvoriť nastavenia</string>
     <string name="follow_battery_later">Teraz nie</string>
-    <string name="whats_new_body">• Trasa: keď prší, spoje s menej chôdzou sú hore, len ak vás nedovezú oveľa neskôr (EM-0081). Chôdza na inú zastávku pri prestupe sa teraz pripočíta k vášmu času na prestup (EM-0082). Ten istý autobus sa už nezobrazí dvakrát (EM-0088).\n• Domov a Práca: podržanie tlačidla bez zastávky v poli Kam poradí, ako ho nastaviť, namiesto zabudnutia (EM-0080).\n• IDS BBSK: prihlásenie opäť funguje, aplikácia prejde novým overením e-shopu, že nie ste robot (EM-0083). Otvorený QR kód je opäť veľký (EM-0084).\n• Sledovanie: zmena zastávky, kde vystupujete, sa prejaví aj na karte (EM-0089); autobus, ktorého živé údaje majú len niektoré zastávky, ukáže všetky (EM-0090); hlásenie o miestach, ktoré sa neodoslalo, to povie a dá sa ťuknúť znova (EM-0086).</string>
+    <string name="whats_new_body">• Vlaky: spojenia vlakom po celom Slovensku, samotné alebo s autobusmi. Hľadajte celé mesto (Zvolen) a dostanete autobusy z jeho autobusovej stanice aj vlaky z jeho železničnej stanice. Prepínače Autobus, MHD a Vlak určia, čo môže hľadanie použiť.\n• Ceny: spojenie ukáže, koľko stojí s vašou dopravnou kartou, a upozorní, keď vám kredit nestačí. Platíte bankovou kartou? Upozornenia vypnete v Pripomienkach.\n• MHD Bratislava, Pezinok, Malacky a Topoľčany.\n• Sledujte viac autobusov naraz; ten, ktorý odchádza prvý, je živý.\n• Obvyklé meškanie sa teraz zobrazí ako \"Zvyčajne mešká ~4 min\" a časy ostávajú podľa cestovného poriadku.\n• Rýchlejšie hľadanie, karty si pamätajú, kde ste boli, a veľa opráv pri sledovaní autobusu a prihlásení do IDS BBSK.</string>
     <string name="topup_button">Dobiť kredit</string>
     <string name="topup_title">Dobitie kreditu na kartu</string>
     <string name="topup_card">Karta %1$s · teraz %2$s</string>
@@ -756,7 +756,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="place_home">Domov</string>
     <string name="place_work">Práca</string>
     <string name="place_not_set">Podržte a nastavte</string>
-    <string name="place_set_hint">Vyberte zastávku „%1$s“ do poľa Kam a potom podržte %1$s.</string>
+    <string name="place_set_hint">Podržte %1$s a vyhľadajte jeho zastávku.</string>
     <string name="place_saved">%1$s: %2$s</string>
     <string name="place_cleared">%1$s zabudnuté</string>
     <string name="place_set_first">Najprv nastavte Domov alebo Prácu: zastávku vyberte do poľa Kam a podržte tlačidlo.</string>
@@ -833,4 +833,32 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="pay_bank_city_hint">V MHD platím bankovou kartou: bez upozornení na nízky kredit</string>
     <string name="pay_bank_region">Prímestské autobusy</string>
     <string name="pay_bank_region_hint">Medzi obcami platím bankovou kartou: bez upozornení na nízky kredit</string>
+    <string name="sources_title">Zdroje údajov</string>
+    <string name="sources_hint">Otvorené údaje, ktoré aplikácia používa, a ich licencie</string>
+    <string name="sources_intro">Plan&amp;Ride používa tieto otvorené údaje. Ťuknutím zobrazíte ich podmienky.</string>
+    <string name="source_bbsk">Banskobystrický samosprávny kraj, otvorené údaje</string>
+    <string name="source_bbsk_what">Zastávky a tarifné zóny IDS BBSK pre cenu cesty. CC BY-SA a CC BY 4.0</string>
+    <string name="source_osm">© prispievatelia OpenStreetMap</string>
+    <string name="source_osm_what">Mapy a trasy pešo. Open Database License (ODbL)</string>
+    <string name="source_meteo">Open-Meteo</string>
+    <string name="source_meteo_what">Počasie pre plánovač. CC BY 4.0</string>
+    <string name="source_bratislava">Hlavné mesto SR Bratislava, otvorené údaje</string>
+    <string name="source_bratislava_what">Cestovné poriadky MHD Bratislava (DPB). CC BY 4.0</string>
+    <string name="source_gtfssk">gtfs.sk</string>
+    <string name="source_gtfssk_what">Cestovné poriadky MHD Pezinok, Malacky a Topoľčany (AZ-Lines), CC BY 4.0; trasy vlakov po trati (z OpenStreetMap)</string>
+    <string name="mode_bus">Autobus</string>
+    <string name="mode_city">MHD</string>
+    <string name="mode_rail">Vlak</string>
+    <string name="town_whole">Celé mesto: jeho autobusová a železničná stanica</string>
+    <string name="fare_plus_train">%1$s + vlak</string>
+    <string name="fare_covered">Predplatené</string>
+    <string name="source_zsr">Železnice Slovenskej republiky</string>
+    <string name="source_zsr_what">Cestovný poriadok vlakov z Národného katalógu otvorených dát. CC BY 1.0</string>
+    <string name="planner_walk_to">Pešo %1$d min do %2$s</string>
+    <string name="walk_other_switch">Pešo na inú zastávku</string>
+    <string name="walk_other_switch_hint">Spojenie môže začať alebo skončiť krátkou chôdzou na blízku zastávku. Vypnuté: začne a skončí presne na zastávkach, ktoré ste vybrali; pri prestupe môžete stále prejsť pešo na inú zastávku.</string>
+    <string name="place_pick_title">Nastaviť: %1$s</string>
+    <string name="place_pick_now">Teraz: %1$s</string>
+    <string name="place_pick_search">Vyhľadajte zastávku</string>
+    <string name="place_pick_clear">Zabudnúť</string>
 </resources>

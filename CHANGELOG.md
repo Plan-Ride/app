@@ -3,6 +3,13 @@
 ## 2.18.0
 
 ### Added
+- **Trains**: connections by train all over Slovakia (ŽSR's open timetable, every passenger train of ŽSSK, RegioJet, Leo Express and TREŽ), alone or together with buses; changes between a bus and a train work like any other. Stations are written out ("Zvolen, osobná stanica"), and "zv os" finds them like stops. Trains are followed by the timetable (no live position yet). Trains come in the downloaded regions too.
+- **Whole towns**: typing "Zvolen" offers the whole town: a search from or to it starts at its bus station and its train station and shows both.
+- **Bus, City, Train**: three switches in the planner choose what a search may use; two train stations search trains only. The searches for the other choices are asked ahead, so switching shows its answer at once.
+- **Bus, train or tram at a glance**: each connection shows a pictogram per kind left of its times; lines have their colour (buses blue, trains black with their kind, "R 845", city lines purple), also on the departure board and in an opened trip.
+- **City transport of Bratislava, Pezinok, Malacky and Topoľčany** (their open timetables).
+- **Walk to other stops**: a setting (on by default); off, a connection starts and ends at exactly the stops you chose. A walk at the start or end of a connection is now shown on it, with where it ends and when.
+- **Data sources**: Settings, Data sources lists the open data the app uses and their licences.
 - **What a journey costs**: a connection shows its price with your transport cards, from the carriers' own price lists (city buses in Zvolen and Banská Bystrica, IDS BBSK by zones), in your category (student, senior, ŤZP…) as your account has it. When your credit won't cover the journey, the connection says so before you go; buses covered by a valid season ticket cost nothing.
 - **Paying by bank card**: two switches in Reminders (city buses, regional buses) turn the credit warnings off for buses you don't pay with credit.
 - **Follow several buses** (EM-0100, EM-0101): following another bus no longer replaces the one already followed. The one leaving first is the live one (notification, home card, widget, watch); the others are listed under it on Home as "Also following", each with its time and a button to stop it. When the live bus ends, is stopped, or left without you (your phone still at the stop, or "It already left" tapped), the next one takes over. Up to five can wait.
@@ -15,6 +22,9 @@
 - **Opens on the planner without an account** (EM-0097): with no account in the app, it now opens on Planner instead of the empty Home tab, and Back returns there. Also on the web.
 
 ### Fixed
+- **Home and Work** (EM-0108): holding the button saved whatever was in To, unseen. It now opens a stop search to choose the place (or forget it), and the button shows the stop's own name.
+- **Google Pay when adding credit** (EM-0109): GP webpay's page inside the app refused Google Pay ("this app uses a WebView"); the app now turns on the payment support Google asks for.
+- **A connection seemed to end at the wrong stop**: a walk from the last bus to the searched stop wasn't shown, so a trip to Nám. Slobody looked like it ended at AS.
 - **The followed bus fell back to "on time"** (EM-0104): riding an early bus, the card went back to "on time" at every stop and the minutes to the next stop went up and down. The delay your phone measured at the last stop now stays until it measures the next one (emHUB's answer to the phone's own "arrived" report counts an early bus as on time and replaced it), and between stops only a bus clearly later than at its last stop counts as later.
 - **A stop the bus had left came back as the next one** (EM-0104): a few metres past a stop, or off the drawn route, the card said the bus was heading to the stop it had just left.
 - **A usual delay looked like a real one** (EM-0107): a bus with no live position was shown as "+4 min late" and its times were shifted, though that was only how late it usually is. Such a bus now goes by the timetable; the card, the widget and the watch say "Usually ~4 min late" instead. The setting (now "Show the usual delay") turns that label off.

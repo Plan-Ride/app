@@ -194,7 +194,9 @@ class LiveRepository(context: Context) {
                 fromTimetable = true,
                 operator = row.operator,
                 scheduleUrl = row.tripUrl,
-                serviceDate = java.time.Instant.ofEpochMilli(row.atMs).atZone(zone).toLocalDate().toString()
+                serviceDate = java.time.Instant.ofEpochMilli(row.atMs).atZone(zone).toLocalDate().toString(),
+                group = row.group,
+                vehicle = row.vehicle
             )
         }
     }
@@ -571,8 +573,10 @@ class LiveRepository(context: Context) {
                     livePlatformId = o.int("platformId") ?: 0
                 )
             }.orEmpty()
+            val mode = json.str("mode")
             return TripDetail(
-                line = ref.line,
+                line = if (mode == "rail") json.str("line").ifBlank { ref.line } else ref.line,
+                vehicle = mode,
                 destination = json.str("headsign").ifBlank { stops.lastOrNull()?.name.orEmpty() },
                 stops = stops,
                 delaySeconds = null,

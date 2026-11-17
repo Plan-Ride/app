@@ -23,7 +23,9 @@ class TimetableService {
         /** ISO date, "" = today. */
         val dateInput: String = "",
         /** EM-0053: [timeInput] is when to be there. */
-        val arriveBy: Boolean = false
+        val arriveBy: Boolean = false,
+        /** 2.18.0: the kinds of transport to search with (TransportModes); the planner's switches unless asked ahead for others. */
+        val modes: Set<String> = TransportModes.planner
     )
 
     /** One row of a stop's departure board; [atMs] is the departure in epoch ms. */
@@ -39,7 +41,10 @@ class TimetableService {
         /** Timetable feed, e.g. "sad-zvolen-as-city". */
         val feed: String = "",
         /** The bus ends its trip at this stop (sadzv lists those as departures too). */
-        val ends: Boolean = false
+        val ends: Boolean = false,
+        /** 2.18.0: "rail", "city" or "bus", and the vehicle ("rail", "tram", "trolleybus", "bus"). */
+        val group: String = "",
+        val vehicle: String = ""
     )
 
     private class Asked(val from: String, val to: String, val at: Long, val key: String)
@@ -50,7 +55,7 @@ class TimetableService {
         val from = stopParam(request.fromSuggestion, request.fromInput)
         val to = stopParam(request.toSuggestion, request.toInput)
         return Asked(from, to, date.atTime(h, m).atZone(SK_ZONE).toEpochSecond(),
-            listOf(from, to, request.directOnly, request.arriveBy, changeMinutes).joinToString("|"))
+            listOf(from, to, request.directOnly, request.arriveBy, changeMinutes, request.modes.sorted(), walkOtherStops).joinToString("|"))
     }
 
     /**
@@ -67,7 +72,7 @@ class TimetableService {
             synchronized(searchCache) { searchCache[a.key] }?.takeIf { now - it.savedMs < SEARCH_CACHE_MS }
                 ?.let { reuse(it.result, it.at, a.at, request.arriveBy) }?.let { return@withLock it }
             try {
-                plan(a.from, a.to, a.at, request.directOnly, emptyList(), request.arriveBy, preload).also { found ->
+                plan(a.from, a.to, a.at, request.directOnly, emptyList(), request.arriveBy, preload, request.modes).also { found ->
                     synchronized(searchCache) {
                         searchCache.remove(a.key)  // back in as the newest
                         searchCache[a.key] = CachedSearch(a.at, now, found)
@@ -184,9 +189,11 @@ class TimetableService {
     }
 
     private fun plan(from: String, to: String, epochS: Long, direct: Boolean, listed: List<String>, arriveBy: Boolean = false,
-                     preload: Boolean = false): TimetableSearchResult {
+                     preload: Boolean = false, modes: Set<String> = TransportModes.planner): TimetableSearchResult {
         val root = HubClient.timetable("plan", mapOf("from" to from, "to" to to, "time" to epochS.toString(), "n" to "5",
+            "modes" to TransportModes.ALL.filter { it in modes }.joinToString(","),
             "direct" to if (direct) "1" else "0", "change" to changeMinutes.toString(), "arrive" to if (arriveBy) "1" else "0") +
+            (if (walkOtherStops) emptyMap() else mapOf("walkstart" to "0", "walkend" to "0")) +
             if (preload) mapOf("pre" to "1") else emptyMap())
         val connections = root.getAsJsonArray("connections").map { parseConnection(it.asJsonObject) }
             .filter { it.id !in listed }.distinctBy { it.id }
@@ -251,7 +258,9 @@ class TimetableService {
                 atMs = at,
                 tripUrl = tripUrl(d.str("tripId"), d.get("seq").asInt, null),
                 feed = d.str("feed"),
-                ends = d.get("ends")?.asBoolean == true
+                ends = d.get("ends")?.asBoolean == true,
+                group = d.str("group"),
+                vehicle = d.str("mode")
             )
         }
 
@@ -308,14 +317,23 @@ class TimetableService {
                 transferRuns = l.getAsJsonObject("transfer")?.get("runs")?.asInt ?: 0,
                 goesOnAs = l.getAsJsonArray("continues")?.map { it.asJsonObject.let { x -> x.str("line") to x.str("stop") } }?.ifEmpty { null },
                 tariff = l.str("tariff").ifBlank { null },
-                units = l.get("units")?.takeIf { it.isJsonPrimitive }?.asInt
+                units = l.get("units")?.takeIf { it.isJsonPrimitive }?.asInt,
+                group = l.str("group").ifBlank { if (mode == "rail") "rail" else "bus" },
+                vehicle = mode.ifBlank { "bus" }
             )
         }
         val minutes = ((c.get("arrival").asLong - c.get("departure").asLong) / 60_000L).toInt()
         val walk = c.getAsJsonArray("legs").map { it.asJsonObject }.filter { it.str("type") == "walk" }
             .sumOf { w -> ((w.get("arrival")?.asLong ?: 0L) - (w.get("departure")?.asLong ?: 0L)) / 60_000L }.toInt()
+        val legs = c.getAsJsonArray("legs").map { it.asJsonObject }
+        fun walkOf(w: JsonObject?) = w?.takeIf { it.str("type") == "walk" }?.let {
+            val m = (((it.get("arrival")?.asLong ?: 0L) - (it.get("departure")?.asLong ?: 0L)) / 60_000L).toInt()
+            Walk(it.getAsJsonObject("to").str("name"), m.coerceAtLeast(1), clock(it.get("arrival").asLong))
+        }
         return TimetableConnection(
             walkMinutes = walk,
+            walkBefore = walkOf(legs.firstOrNull()),
+            walkAfter = walkOf(legs.lastOrNull()),
             id = trips.joinToString("|") { it.str("tripId") },
             departureTime = segments.firstOrNull()?.departureTime ?: clock(c.get("departure").asLong),
             arrivalTime = segments.lastOrNull()?.arrivalTime ?: clock(c.get("arrival").asLong),
@@ -329,7 +347,9 @@ class TimetableService {
         value = s.str("id"),
         value2 = HUB_STOP,
         coorX = s.get("lat")?.takeIf { it.isJsonPrimitive }?.asString,
-        coorY = s.get("lon")?.takeIf { it.isJsonPrimitive }?.asString
+        coorY = s.get("lon")?.takeIf { it.isJsonPrimitive }?.asString,
+        modes = s.getAsJsonArray("modes")?.map { it.asString }.orEmpty(),
+        town = s.get("town")?.asBoolean == true
     )
 
     private class CachedSearch(val at: Long, val savedMs: Long, val result: TimetableSearchResult)
@@ -364,6 +384,8 @@ class TimetableService {
 
         /** Least time between two buses (minutes, 0 = any) the planner leaves for a change: the rider's setting. */
         @Volatile var changeMinutes = 1
+        /** 2.18.0: the rider's "walk to other stops" setting. */
+        @Volatile var walkOtherStops = true
 
         fun tripUrl(tripId: String, from: Int?, to: Int?): String =
             "hub:trip?id=" + java.net.URLEncoder.encode(tripId, "UTF-8") + (from?.let { "&from=$it" } ?: "") + (to?.let { "&to=$it" } ?: "")

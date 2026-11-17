@@ -160,7 +160,7 @@ object HubClient {
     /** GET /api/v1/timetable/[path] (stops, departures, trip, plan); blocking, call off the main thread. */
     fun timetable(path: String, params: Map<String, String>): JsonObject {
         val url = "${BuildConfig.HUB_URL}/api/v1/timetable/$path".toHttpUrl().newBuilder().apply {
-            params.forEach { (k, v) -> addQueryParameter(k, v) }
+            (com.ksjd.testem.TransportModes.params(path) + params).forEach { (k, v) -> addQueryParameter(k, v) }
         }.build()
         return execute(Request.Builder().url(url).get())
     }
@@ -173,7 +173,7 @@ object HubClient {
     /** 2.17.0: a large timetable answer (an offline region) streamed straight into [target]. */
     fun timetableToFile(path: String, params: Map<String, String>, target: java.io.File) {
         val url = "${BuildConfig.HUB_URL}/api/v1/timetable/$path".toHttpUrl().newBuilder().apply {
-            params.forEach { (k, v) -> addQueryParameter(k, v) }
+            (com.ksjd.testem.TransportModes.params(path) + params).forEach { (k, v) -> addQueryParameter(k, v) }
         }.build()
         client.newCall(Request.Builder().url(url).header("X-App-Key", BuildConfig.HUB_APP_KEY)
             .header("X-App-Version", "android ${BuildConfig.VERSION_NAME}").get().build()).execute().use { response ->

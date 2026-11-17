@@ -343,6 +343,9 @@ class CredentialsManager(context: Context) {
 
     /** Use the phone's location (on the phone only) to say whether the user will catch the bus. */
     /** Least time to change buses in the planner, minutes (0 = any connection, however tight). */
+    /** 2.18.0: connections may start or end with a walk to another stop (off: only the chosen stops themselves). */
+    fun getWalkToOtherStops(): Boolean = prefs.getBoolean("walk_other_stops", true)
+    fun saveWalkToOtherStops(on: Boolean) = prefs.edit().putBoolean("walk_other_stops", on).apply()
     fun getChangeMinutes(): Int = prefs.getInt("change_minutes", 1)
     fun saveChangeMinutes(minutes: Int) = prefs.edit().putInt("change_minutes", minutes).apply()
 
@@ -361,6 +364,10 @@ class CredentialsManager(context: Context) {
     fun saveAnalyticsEnabled(enabled: Boolean) = prefs.edit().putBoolean("analytics_enabled", enabled).apply()
 
     /** EM-0072: the rider goes to the stop by car: catch estimates and leave-by alerts in driving time. */
+    /** 2.18.0: the planner's transport switches (see TransportModes); all on until the rider turns one off. */
+    fun getPlannerModes(): Set<String> = prefs.getString("planner_modes", null)?.split(",")
+        ?.filter { it in TransportModes.ALL }?.toSet()?.ifEmpty { null } ?: TransportModes.ALL.toSet()
+    fun savePlannerModes(modes: Set<String>) = prefs.edit().putString("planner_modes", modes.joinToString(",")).apply()
     fun getCatchByCar(): Boolean = prefs.getBoolean("catch_by_car", false)
     fun saveCatchByCar(byCar: Boolean) = prefs.edit().putBoolean("catch_by_car", byCar).apply()
 

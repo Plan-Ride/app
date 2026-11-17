@@ -195,6 +195,10 @@ private fun PaymentPage(gate: TicketSession.PaymentGate, cookies: List<Pair<Stri
                     WebView(context).apply {
                         settings.javaScriptEnabled = true  // GP webpay and 3-D Secure need it
                         settings.domStorageEnabled = true
+                        // EM-0109: Google Pay refused to open here ("this app uses a WebView") without the Payment Request API.
+                        if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.PAYMENT_REQUEST)) {
+                            androidx.webkit.WebSettingsCompat.setPaymentRequestEnabled(settings, true)
+                        }
                         CookieManager.getInstance().let { jar ->
                             jar.setAcceptCookie(true)
                             jar.setAcceptThirdPartyCookies(this, true)

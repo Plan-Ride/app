@@ -1,5 +1,9 @@
 package com.ksjd.testem.ui.components
 
+import androidx.compose.material.icons.filled.DirectionsRailway
+import androidx.compose.material.icons.outlined.Tram
+import androidx.compose.material.icons.outlined.DirectionsBus
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -312,5 +316,64 @@ class TicketStubShape(private val cornerRadius: Dp, private val notchRadius: Dp,
             addOval(androidx.compose.ui.geometry.Rect(Offset(size.width, y), n))
         }
         return Outline.Generic(Path().apply { op(body, notches, PathOperation.Difference) })
+    }
+}
+
+
+// ------------------------------------------------------------ 2.18.0: trains, trams and buses told apart
+
+/** Train lines are written with their kind in front: "Os 7308", "R 845", "IC 501", "REX 1810". */
+private val RAIL_LINE = Regex("^(Os|R|REX|RR|Ex|IC|EC|EN|SC|RJ|LE|ZR|Zr|Sp|Sv|Mn|Rx|RE|ICE|NJ|D)\\s*\\d+.*")
+
+/** "rail", "tram", "trolleybus", "city" or "bus", from what is known about a line (its kind, vehicle, or how it is written). */
+fun lineKind(line: String, group: String = "", vehicle: String = ""): String = when {
+    group == "rail" || vehicle == "rail" || RAIL_LINE.matches(line.trim()) -> "rail"
+    vehicle == "tram" -> "tram"
+    vehicle == "trolleybus" -> "trolleybus"
+    group == "city" -> "city"
+    else -> "bus"
+}
+
+fun kindIcon(kind: String): androidx.compose.ui.graphics.vector.ImageVector = when (kind) {
+    "rail" -> androidx.compose.material.icons.Icons.Filled.DirectionsRailway
+    "tram" -> androidx.compose.material.icons.Icons.Outlined.Tram
+    else -> androidx.compose.material.icons.Icons.Outlined.DirectionsBus
+}
+
+/** City lines (MHD: city buses, trams, trolleybuses) are purple; buses the app's own colour, trains black (light on dark). */
+private val CityColor = Color(0xFF6B3A8E)
+
+/** (plate, text on it) of a kind: buses in the app's main colour, trains black like the old plates, city lines purple. */
+@Composable
+private fun kindColors(kind: String, onBoard: Boolean = false): Pair<Color, Color> = when (kind) {
+    "rail" -> if (onBoard) TransitTheme.colors.boardText to TransitTheme.colors.board else TransitTheme.colors.plate to TransitTheme.colors.onPlate
+    "tram", "trolleybus", "city" -> CityColor to Color.White
+    else -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+}
+
+/** The pictogram of a line's kind, in the kind's colour. */
+@Composable
+fun KindIcon(kind: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 26.dp) {
+    val tint = when (kind) {
+        "rail" -> MaterialTheme.colorScheme.onSurface
+        "tram", "trolleybus", "city" -> CityColor
+        else -> MaterialTheme.colorScheme.primary
+    }
+    androidx.compose.material3.Icon(kindIcon(kind), null, modifier.size(size), tint = tint)
+}
+
+/** A line's plate in its kind's colour: a train keeps its kind in the text ("R 845"), others show the number. */
+@Composable
+fun KindPlate(line: String, kind: String, modifier: Modifier = Modifier, onBoard: Boolean = false) {
+    val (background, content) = kindColors(kind, onBoard)
+    val text = if (kind == "rail") line.trim() else line.trim().substringAfterLast(' ')
+    Box(
+        modifier = modifier
+            .defaultMinSize(minWidth = 40.dp, minHeight = 28.dp)
+            .background(background, RoundedCornerShape(5.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text.ifBlank { "–" }, style = PlateStyle, color = content, maxLines = 1)
     }
 }

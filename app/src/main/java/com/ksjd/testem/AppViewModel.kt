@@ -835,7 +835,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val state = _timetableState.value
         preloadJob = viewModelScope.launch(Dispatchers.IO) {
             delay(150)  // a time being typed, a swap right after a pick
+            // 2.18.0: first what the switches ask for, then the same trip with buses added (turning them on is instant)
+            // and with buses only (turning trains off is instant); the asked-ahead answers stay 10 minutes.
+            val chosen = TransportModes.planner
+            val more = listOf(chosen + setOf("bus", "city"), setOf("bus", "city")).filter { it != chosen }.distinct()
             routes.forEach { timetableService.searchConnections(searchRequest(it, state), preload = true) }
+            routes.firstOrNull()?.let { first ->
+                more.forEach { modes -> timetableService.searchConnections(searchRequest(first, state).copy(modes = modes), preload = true) }
+            }
         }
     }
 

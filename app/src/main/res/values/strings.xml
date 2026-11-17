@@ -115,7 +115,7 @@
 
     <!-- Planner -->
     <string name="planner_title">Planner</string>
-    <string name="planner_subtitle">Regional and long-distance buses</string>
+    <string name="planner_subtitle">Buses, trains and city transport</string>
     <string name="planner_swap">Swap from and to</string>
     <string name="planner_now">Leave now</string>
     <string name="planner_pick_time">Pick a time</string>
@@ -544,7 +544,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="planner_goes_on_as">Stay on, goes on as %1$s</string>
     <string name="track_goes_on_as">Goes on as line %1$s: stay on</string>
     <string name="whats_new_version" translatable="false">2.18.0</string>
-    <string name="whats_new_body">• Planner: in the rain, connections with less walking come first only if they don\'t get you there much later (EM-0081). A walk to another stop for a change now counts on top of your change time (EM-0082). The same bus is no longer listed twice (EM-0088).\n• Home and Work: holding the button without a stop in To says how to set it, instead of forgetting it (EM-0080).\n• IDS BBSK: signing in works again: the app now passes the e-shop\'s new robot check (EM-0083). The QR code tapped open is big again (EM-0084).\n• Following: changing where you get off updates the card (EM-0089); a bus whose live data lists only some stops shows them all (EM-0090); a seat report that couldn\'t be sent says so and can be tapped again (EM-0086).</string>
+    <string name="whats_new_body">• Trains: connections by train across Slovakia, alone or with buses. Search a whole town (Zvolen) to get buses from its bus station and trains from its train station. The Bus, City and Train switches choose what the search may use.\n• Prices: a connection shows what it costs with your transport card, and warns when your credit won\'t cover it. Paying by bank card? Turn the warnings off in Reminders.\n• City transport of Bratislava, Pezinok, Malacky and Topoľčany.\n• Follow several buses at once; the first to leave is the live one.\n• A usual delay now says \"Usually ~4 min late\" and the times stay the timetable\'s.\n• Faster searches, tabs keep their place, and many fixes when following a bus and signing in to IDS BBSK.</string>
     <string name="topup_button">Add credit</string>
     <string name="topup_title">Add credit to your card</string>
     <string name="topup_card">Card %1$s · credit now %2$s</string>
@@ -741,7 +741,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="place_home">Home</string>
     <string name="place_work">Work</string>
     <string name="place_not_set">Hold to set</string>
-    <string name="place_set_hint">Choose your %1$s stop in To, then hold %1$s to keep it.</string>
+    <string name="place_set_hint">Hold %1$s and search for its stop.</string>
     <string name="place_saved">%1$s: %2$s</string>
     <string name="place_cleared">%1$s forgotten</string>
     <string name="place_set_first">Set Home or Work first: choose the stop in To, then hold the button.</string>
@@ -821,4 +821,32 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="pay_bank_city_hint">I pay city buses with a bank card: no low-credit warnings for them</string>
     <string name="pay_bank_region">Regional buses</string>
     <string name="pay_bank_region_hint">I pay buses between towns with a bank card: no low-credit warnings for them</string>
+    <string name="sources_title">Data sources</string>
+    <string name="sources_hint">Open data used in the app and their licences</string>
+    <string name="sources_intro">Plan&amp;Ride uses these open data. Tap one to see its terms.</string>
+    <string name="source_bbsk">Banská Bystrica Self-Governing Region, open data</string>
+    <string name="source_bbsk_what">IDS BBSK stops and fare zones, for the price of a journey. CC BY-SA and CC BY 4.0</string>
+    <string name="source_osm">© OpenStreetMap contributors</string>
+    <string name="source_osm_what">Maps and walking routes. Open Database License (ODbL)</string>
+    <string name="source_meteo">Open-Meteo</string>
+    <string name="source_meteo_what">Weather for the planner. CC BY 4.0</string>
+    <string name="source_bratislava">City of Bratislava, open data</string>
+    <string name="source_bratislava_what">Bratislava public transport timetables (DPB). CC BY 4.0</string>
+    <string name="source_gtfssk">gtfs.sk</string>
+    <string name="source_gtfssk_what">City bus timetables of Pezinok, Malacky and Topoľčany (AZ-Lines), CC BY 4.0; trains drawn along the railway (from OpenStreetMap)</string>
+    <string name="mode_bus">Bus</string>
+    <string name="mode_city">City</string>
+    <string name="mode_rail">Train</string>
+    <string name="town_whole">Whole town: its bus station and train station</string>
+    <string name="fare_plus_train">%1$s + train</string>
+    <string name="fare_covered">On your pass</string>
+    <string name="source_zsr">Railways of the Slovak Republic (ŽSR)</string>
+    <string name="source_zsr_what">Train timetables, from the national open data catalogue. CC BY 1.0</string>
+    <string name="planner_walk_to">Walk %1$d min to %2$s</string>
+    <string name="walk_other_switch">Walk to other stops</string>
+    <string name="walk_other_switch_hint">A connection may start or end with a short walk to a nearby stop. Off: it starts and ends exactly at the stops you chose; a change between buses can still be a short walk to another stop.</string>
+    <string name="place_pick_title">Set %1$s</string>
+    <string name="place_pick_now">Now: %1$s</string>
+    <string name="place_pick_search">Search for a stop</string>
+    <string name="place_pick_clear">Forget it</string>
 </resources>

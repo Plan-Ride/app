@@ -476,7 +476,7 @@ private fun JourneysSection(journeys: List<SavedJourney>, now: Long, viewModel: 
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        c.segments.forEach { LinePlate(it.line.trim().substringAfterLast(' ').ifBlank { "–" }) }
+                        c.segments.forEach { com.ksjd.testem.ui.components.KindPlate(it.line, com.ksjd.testem.ui.components.lineKind(it.line, it.group, it.vehicle)) }
                         Spacer(Modifier.weight(1f))
                         if (following) {
                             Text(stringResource(R.string.home_following), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)

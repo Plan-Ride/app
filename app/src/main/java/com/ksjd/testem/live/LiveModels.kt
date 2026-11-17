@@ -44,7 +44,10 @@ data class LiveDeparture(
     val operator: String = "",
     /** Timetable trip link (TimetableService.tripUrl) of a [fromTimetable] bus, and its service date. */
     val scheduleUrl: String = "",
-    val serviceDate: String = ""
+    val serviceDate: String = "",
+    /** 2.18.0: kind of transport from emHUB ("rail", "city", "bus") and its vehicle, for the pictogram. */
+    val group: String = "",
+    val vehicle: String = ""
 ) {
     val key: String get() = if (fromTimetable) "cp-$line-$plannedSecondOfDay-$destination" else "$lineId-$tripNumber-$plannedSecondOfDay"
 }
@@ -104,7 +107,9 @@ data class TripDetail(
     /** Where the current position comes from, best first: rider GPS, bus GPS, riders' taps, delay, timetable. */
     val positionSource: PositionSource = PositionSource.Timetable,
     /** The bus's own GPS position when it is fresh (to place it on the route). */
-    val busPosition: Pair<Double, Double>? = null
+    val busPosition: Pair<Double, Double>? = null,
+    /** 2.18.0: the timetable's vehicle for trips from emHUB ("rail", "tram", "trolleybus", "bus"); "" when not known. */
+    val vehicle: String = ""
 ) {
     /** 2.17.2: the delay at stop [i]: from earlier days that stop's own, else the one delay known for the bus. */
     fun delayAt(i: Int): Int? = if (positionSource == PositionSource.History && history != null) history.atStop(i) else delaySeconds

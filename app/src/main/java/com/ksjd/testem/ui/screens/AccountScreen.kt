@@ -96,7 +96,7 @@ import com.ksjd.testem.ui.components.SectionLabel
 import com.ksjd.testem.ui.components.daysLeftText
 import com.ksjd.testem.ui.theme.TransitTheme
 
-private enum class SettingsPage { Appearance, Security, Reminders, Language, Community, Watch, Offline, BugReport, Feature, Developer }
+private enum class SettingsPage { Appearance, Security, Reminders, Language, Community, Watch, Offline, BugReport, Feature, Developer, Sources }
 
 @Composable
 fun AccountScreen(viewModel: AppViewModel, onUnlock: () -> Unit, onSignIn: (Wallet) -> Unit) {
@@ -354,6 +354,19 @@ private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSig
                 )
             }
             GroupDivider()
+            var walkOther by remember { mutableStateOf(prefs.getWalkToOtherStops()) }
+            val setWalkOther: (Boolean) -> Unit = { on ->
+                walkOther = on
+                prefs.saveWalkToOtherStops(on)
+                com.ksjd.testem.TimetableService.walkOtherStops = on
+            }
+            ListRow(
+                stringResource(R.string.walk_other_switch),
+                subtitle = stringResource(R.string.walk_other_switch_hint),
+                onClick = { setWalkOther(!walkOther) },
+                trailing = { Switch(walkOther, setWalkOther) }
+            )
+            GroupDivider()
             var haptics by remember { mutableStateOf(prefs.getHapticsEnabled()) }
             val setHaptics: (Boolean) -> Unit = { on ->
                 haptics = on
@@ -390,6 +403,8 @@ private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSig
             SettingsLink(stringResource(R.string.privacy_policy_title), stringResource(R.string.privacy_policy_hint)) {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(siteUrl(context, "privacy")))) }
             }
+            GroupDivider()
+            SettingsLink(stringResource(R.string.sources_title), stringResource(R.string.sources_hint)) { onOpen(SettingsPage.Sources) }
         }
         if (app.anyAccount) {
             Spacer(Modifier.height(16.dp))
@@ -598,6 +613,7 @@ private fun SettingsPageScreen(page: SettingsPage, viewModel: AppViewModel, onBa
         SettingsPage.BugReport -> stringResource(R.string.bug_title)
         SettingsPage.Feature -> stringResource(R.string.feature_title)
         SettingsPage.Developer -> stringResource(R.string.settings_developer)
+        SettingsPage.Sources -> stringResource(R.string.sources_title)
     }
     Column(
         Modifier
@@ -620,6 +636,7 @@ private fun SettingsPageScreen(page: SettingsPage, viewModel: AppViewModel, onBa
             SettingsPage.BugReport -> BugReportForm(viewModel, onDone = onBack)
             SettingsPage.Feature -> BugReportForm(viewModel, onDone = onBack, feature = true)
             SettingsPage.Developer -> DeveloperSettings(viewModel)
+            SettingsPage.Sources -> SourcesPage()
         }
     }
 }
@@ -1042,4 +1059,32 @@ private fun DeveloperSettings(viewModel: AppViewModel) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 20.dp)
     )
+}
+
+/** 1.55.0 / 2.18.0: the data providers whose licence asks to be named, each a link to its own page. */
+@Composable
+private fun SourcesPage() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sources = listOf(
+        Triple(R.string.source_bbsk, R.string.source_bbsk_what, "https://opendata.bbsk.sk/"),
+        Triple(R.string.source_bratislava, R.string.source_bratislava_what, "https://opendata.bratislava.sk/"),
+        Triple(R.string.source_gtfssk, R.string.source_gtfssk_what, "https://gtfs.sk/"),
+        Triple(R.string.source_zsr, R.string.source_zsr_what, "https://data.slovensko.sk/datasety/ebeeedf1-aca2-451a-bdc0-35d536714888"),
+        Triple(R.string.source_osm, R.string.source_osm_what, "https://www.openstreetmap.org/copyright"),
+        Triple(R.string.source_meteo, R.string.source_meteo_what, "https://open-meteo.com/")
+    )
+    Text(
+        stringResource(R.string.sources_intro),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+    )
+    ListGroup {
+        sources.forEachIndexed { i, (name, what, url) ->
+            if (i > 0) GroupDivider()
+            ListRow(stringResource(name), subtitle = stringResource(what), onClick = {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            })
+        }
+    }
 }

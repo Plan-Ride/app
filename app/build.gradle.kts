@@ -27,7 +27,7 @@ android {
         applicationId = "com.ksjd.testem"
         minSdk = 24
         targetSdk = 36
-        versionCode = 36
+        versionCode = 37
         versionName = "2.18.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -133,6 +133,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    // EM-0109: Google Pay on GP webpay's page in our WebView needs the Payment Request API (androidx.webkit 1.14+).
+    implementation("androidx.webkit:webkit:1.14.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Networking

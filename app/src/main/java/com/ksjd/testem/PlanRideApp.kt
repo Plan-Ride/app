@@ -8,5 +8,6 @@ class PlanRideApp : Application() {
         super.onCreate()
         com.ksjd.testem.hub.AppLogs.installCrashRecorder(this)
         com.ksjd.testem.offline.OfflineTimetables.init(this)
+        TransportModes.load(this)
     }
 }

@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         }
         com.ksjd.testem.ui.components.Haptics.enabled = CredentialsManager(this).getHapticsEnabled()
         TimetableService.changeMinutes = CredentialsManager(this).getChangeMinutes()
+        TimetableService.walkOtherStops = CredentialsManager(this).getWalkToOtherStops()
         // Cheap, and catches a changed alarm permission or a missed reboot.
         com.ksjd.testem.rides.RideScheduler.reschedule(applicationContext)
         com.ksjd.testem.reminders.LastBus.reschedule(applicationContext)

@@ -417,7 +417,11 @@ private fun BoardRow(departure: LiveDeparture, now: Long, highlighted: Boolean, 
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LinePlate(departure.line, onBoard = true)
+        // 2.18.0: what it is at a glance: a train, a tram, a bus.
+        val kind = com.ksjd.testem.ui.components.lineKind(departure.line, departure.group, departure.vehicle)
+        com.ksjd.testem.ui.components.KindIcon(kind, size = 22.dp)
+        Spacer(Modifier.width(6.dp))
+        com.ksjd.testem.ui.components.KindPlate(departure.line, kind, onBoard = true)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -505,7 +509,12 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(horizontal = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                LinePlate(trip.ref.line)
+                // 2.18.0: a train shows its kind and number ("R 845") in the train colour, with the pictogram.
+                val sheetLine = trip.detail?.line?.takeIf { it.isNotBlank() } ?: trip.ref.line
+                val sheetKind = com.ksjd.testem.ui.components.lineKind(sheetLine, vehicle = trip.detail?.vehicle.orEmpty())
+                com.ksjd.testem.ui.components.KindIcon(sheetKind, size = 28.dp)
+                Spacer(Modifier.width(6.dp))
+                com.ksjd.testem.ui.components.KindPlate(sheetLine, sheetKind)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(

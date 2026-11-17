@@ -1,5 +1,11 @@
 package com.ksjd.testem.ui.screens
 
+import androidx.compose.material.icons.outlined.LocationCity
+import androidx.compose.material.icons.filled.DirectionsRailway
+import androidx.compose.material.icons.outlined.Tram
+import androidx.compose.material.icons.outlined.DirectionsBus
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.outlined.Check
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -242,6 +248,21 @@ private fun PlacesRow(state: TimetableState, viewModel: AppViewModel) {
     val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) {
         pending?.let(go); pending = null
     }
+    var picking by remember { mutableStateOf<String?>(null) }
+    picking?.let { kind ->
+        val name = stringResource(if (kind == "home") R.string.place_home else R.string.place_work)
+        PlacePicker(name, places[kind], onDismiss = { picking = null }) { picked ->
+            picking = null
+            haptic(Haptics.CONFIRM)
+            prefs.savePlace(kind, picked)
+            com.ksjd.testem.reminders.LastBus.reschedule(context)
+            placesScope.launch { com.ksjd.testem.widget.PlacesWidget.refresh(context) }
+            places = places + (kind to picked)
+            android.widget.Toast.makeText(context,
+                if (picked != null) context.getString(R.string.place_saved, name, picked.selectedText) else context.getString(R.string.place_cleared, name),
+                android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("home" to R.string.place_home, "work" to R.string.place_work).forEach { (kind, label) ->
             val place = places[kind]
@@ -258,23 +279,8 @@ private fun PlacesRow(state: TimetableState, viewModel: AppViewModel) {
                             else -> { pending = place; askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION)) }
                         }
                     },
-                    onLongClick = {
-                        val to = state.selectedToSuggestion?.takeIf { it.selectedText.equals(state.toInput.trim(), true) }
-                        // EM-0080: forgetting is only for a set place with To empty; anything else says how to set it.
-                        if (to == null && (place == null || state.toInput.isNotBlank())) {
-                            haptic(Haptics.TAP)
-                            android.widget.Toast.makeText(context, context.getString(R.string.place_set_hint, name), android.widget.Toast.LENGTH_LONG).show()
-                            return@combinedClickable
-                        }
-                        haptic(Haptics.CONFIRM)
-                        prefs.savePlace(kind, to)
-                        com.ksjd.testem.reminders.LastBus.reschedule(context)
-                        placesScope.launch { com.ksjd.testem.widget.PlacesWidget.refresh(context) }
-                        places = places + (kind to to)
-                        android.widget.Toast.makeText(context,
-                            if (to != null) context.getString(R.string.place_saved, name, to.selectedText) else context.getString(R.string.place_cleared, name),
-                            android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                    // EM-0108: holding it opens a stop search to choose the place (it took whatever To had, unseen).
+                    onLongClick = { haptic(Haptics.TAP); picking = kind }
                 )
             ) {
                 Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -282,8 +288,10 @@ private fun PlacesRow(state: TimetableState, viewModel: AppViewModel) {
                     Spacer(Modifier.width(8.dp))
                     Column {
                         Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(place?.selectedText ?: stringResource(R.string.place_not_set), style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        // EM-0108: the stop itself, not the town every place starts with ("Banská Bystrica, …").
+                        val stopName = place?.selectedText?.let { full -> full.substringAfter(", ", full) }
+                        Text(stopName ?: stringResource(R.string.place_not_set), style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -444,6 +452,26 @@ private fun SearchForm(state: TimetableState, viewModel: AppViewModel) {
             Text(stringResource(R.string.planner_direct), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Switch(checked = state.directOnly, onCheckedChange = viewModel::setTimetableDirectOnly)
         }
+        // 2.18.0: which kinds of transport the search may use; a found list is searched again at once.
+        var modes by remember { mutableStateOf(com.ksjd.testem.TransportModes.planner) }
+        val modeContext = LocalContext.current
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            com.ksjd.testem.TransportModes.ALL.forEach { mode ->
+                FilterChip(
+                    selected = mode in modes,
+                    onClick = {
+                        haptic(Haptics.TAP)
+                        modes = com.ksjd.testem.TransportModes.toggle(modeContext, mode)
+                        if (state.connections.isNotEmpty()) viewModel.loadTimetables()
+                    },
+                    label = { Text(stringResource(modeName(mode))) },
+                    leadingIcon = { Icon(modeIcon(mode), null, Modifier.size(18.dp)) }
+                )
+            }
+        }
         Spacer(Modifier.height(12.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -504,9 +532,25 @@ private fun StopField(
                         .clickable { onPick(s) }
                         .padding(horizontal = 8.dp, vertical = 10.dp)
                 ) {
-                    Text(s.selectedText, style = MaterialTheme.typography.bodyLarge)
-                    if (s.description.isNotBlank()) {
-                        Text(s.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // 2.18.0: a pictogram says what it is: a whole town, a train station, a stop.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val icon = when {
+                            s.town -> Icons.Outlined.LocationCity
+                            s.modes == listOf("rail") -> Icons.Filled.DirectionsRailway
+                            s.modes.isNotEmpty() -> Icons.Outlined.DirectionsBus
+                            else -> null
+                        }
+                        icon?.let {
+                            Icon(it, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Column {
+                            Text(s.selectedText, style = MaterialTheme.typography.bodyLarge)
+                            val note = if (s.town) stringResource(R.string.town_whole) else s.description
+                            if (note.isNotBlank()) {
+                                Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
             }
@@ -602,15 +646,24 @@ private fun ConnectionCard(
     ) {
         Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${connection.departureTime} – ${connection.arrivalTime}",
-                    style = TimeStyle.copy(fontSize = MaterialTheme.typography.headlineSmall.fontSize),
-                    modifier = Modifier.weight(1f)
-                )
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(connection.totalDuration, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    fare.first?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                // 2.18.0: what carries you (a pictogram per kind, in order), then the times with how long and the price
+                // under them, so long ones never overlap.
+                val kinds = connection.segments.map { com.ksjd.testem.ui.components.lineKind(it.line, it.group, it.vehicle) }.distinct()
+                Row(Modifier.padding(end = 10.dp)) {
+                    kinds.take(3).forEach { com.ksjd.testem.ui.components.KindIcon(it, size = 30.dp) }
                 }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "${connection.departureTime} – ${connection.arrivalTime}",
+                        style = TimeStyle.copy(fontSize = MaterialTheme.typography.headlineSmall.fontSize),
+                        maxLines = 1
+                    )
+                    Text(
+                        listOfNotNull(connection.totalDuration, fare.first).joinToString("  ·  "),
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 // Star: keep it on the home tab. Repeat: follow it by itself on chosen days.
                 IconButton(onClick = onToggleSave) {
                     Icon(
@@ -630,6 +683,8 @@ private fun ConnectionCard(
                 }
             }
             fare.second?.let { Notice(it, tone = NoticeTone.Warning, modifier = Modifier.padding(end = 12.dp, bottom = 6.dp)) }
+            // 2.18.0: a walk to the first bus and from the last one is part of the trip: shown, with where it ends.
+            connection.walkBefore?.let { WalkRow(it) }
             connection.segments.forEachIndexed { index, segment ->
                 if (index > 0) {
                     Row(Modifier.padding(start = 52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -666,11 +721,12 @@ private fun ConnectionCard(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .then(if (canOpenTrip) Modifier.clickable { onOpenTrip(segment, lineNumber(segment.line)) } else Modifier)
+                        .then(if (canOpenTrip) Modifier.clickable { onOpenTrip(segment, tripLine(segment)) } else Modifier)
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    LinePlate(lineNumber(segment.line).ifBlank { "–" })
+                    // 2.18.0: the line in its kind's colour (the pictogram is at the top of the card).
+                    com.ksjd.testem.ui.components.KindPlate(segment.line, com.ksjd.testem.ui.components.lineKind(segment.line, segment.group, segment.vehicle))
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         SegmentStopLine(segment.departureTime, segment.departureStop, segment.departurePlatform)
@@ -692,7 +748,7 @@ private fun ConnectionCard(
                 ) {
                     if (canOpenTrip) {
                         AssistChip(
-                            onClick = { onOpenTrip(segment, lineNumber(segment.line)) },
+                            onClick = { onOpenTrip(segment, tripLine(segment)) },
                             label = { Text(stringResource(R.string.planner_show_stops), maxLines = 1) }
                         )
                         Spacer(Modifier.width(8.dp))
@@ -705,6 +761,7 @@ private fun ConnectionCard(
                     }
                 }
             }
+            connection.walkAfter?.let { WalkRow(it) }
             // A connection with changes: follow all its buses as one journey.
             val legs = connection.segments.mapNotNull { s -> plannerTrip(s, lineNumber(s.line)) }
             if (legs.size > 1) {
@@ -806,10 +863,11 @@ private fun fareNote(
     // only its zones, which the e-shop page doesn't list), and a valid SAD Zvolen one as covering both cities.
     val cost = com.ksjd.testem.Fares.cost(tariffs, connection.segments, category, cityPass, passes.isNotEmpty())
     val price = when {
+        cost.totalCents == 0 && cost.covered -> context.getString(R.string.fare_covered)
         cost.totalCents == 0 -> null
         cost.unknown -> context.getString(R.string.fare_from, com.ksjd.testem.ui.Format.money(cost.totalCents / 100.0))
         else -> com.ksjd.testem.ui.Format.money(cost.totalCents / 100.0)
-    }
+    }?.let { if (cost.train) context.getString(R.string.fare_plus_train, it) else it }
     val prefs = com.ksjd.testem.CredentialsManager(context)
     fun short(name: Int, credit: Double?, cents: Int, bankCard: Boolean): String? =
         if (!bankCard && credit != null && cents > Math.round(credit * 100)) context.getString(R.string.fare_short, context.getString(name),
@@ -820,3 +878,66 @@ private fun fareNote(
     ).joinToString("\n").ifBlank { null }
     return price to warning
 }
+
+/** EM-0108: Home or Work chosen by searching for its stop (the whole name shown), or forgotten. */
+@Composable
+private fun PlacePicker(name: String, current: CpStopSuggestion?, onDismiss: () -> Unit, onPick: (CpStopSuggestion?) -> Unit) {
+    val service = remember { com.ksjd.testem.TimetableService() }
+    var query by remember { mutableStateOf("") }
+    var found by remember { mutableStateOf<List<CpStopSuggestion>>(emptyList()) }
+    LaunchedEffect(query) {
+        if (query.trim().length < 2) { found = emptyList(); return@LaunchedEffect }
+        kotlinx.coroutines.delay(300)
+        found = withContext(kotlinx.coroutines.Dispatchers.IO) { service.suggestStops("", query).getOrDefault(emptyList()).take(6) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.place_pick_title, name)) },
+        text = {
+            Column {
+                current?.let {
+                    Text(stringResource(R.string.place_pick_now, it.selectedText), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                }
+                OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+                    label = { Text(stringResource(R.string.place_pick_search)) }, modifier = Modifier.fillMaxWidth())
+                found.forEach { s ->
+                    Text(s.selectedText, style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(s) }.padding(vertical = 10.dp))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = current?.let { { TextButton(onClick = { onPick(null) }) { Text(stringResource(R.string.place_pick_clear)) } } }
+    )
+}
+
+/** "Walk 8 min to Banská Bystrica, Nám.Slobody", with the time of getting there. */
+@Composable
+private fun WalkRow(walk: com.ksjd.testem.Walk) {
+    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.planner_walk_to, walk.minutes, walk.stop), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(walk.arrivalTime, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 12.dp))
+    }
+}
+
+/** 2.18.0: the line an opened trip keeps: a train its kind too ("R 845"), others just the number. */
+private fun tripLine(segment: TimetableSegment) = if (segment.group == "rail") segment.line.trim() else lineNumber(segment.line)
+
+/** 2.18.0: the switch and pictogram of each kind of transport. */
+private fun modeName(mode: String) = when (mode) {
+    "rail" -> R.string.mode_rail
+    "city" -> R.string.mode_city
+    else -> R.string.mode_bus
+}
+
+private fun modeIcon(mode: String) = when (mode) {
+    "rail" -> Icons.Filled.DirectionsRailway
+    "city" -> Icons.Outlined.Tram
+    else -> Icons.Outlined.DirectionsBus
+}
+
