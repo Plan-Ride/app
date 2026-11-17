@@ -67,13 +67,16 @@ class FaresTest {
 
     @Test
     fun seasonTicketsAndUnknownPrices() {
-        assertEquals(JourneyCost(0, 90, false), cost(city("7", "6:40"), region("7:00", 25), cityPass = true))
-        assertEquals(JourneyCost(27, 0, false), cost(city("7", "6:40"), region("7:00", 25), regionPass = true))
+        assertEquals(JourneyCost(0, 90, false, covered = true), cost(city("7", "6:40"), region("7:00", 25), cityPass = true))
+        assertEquals(JourneyCost(27, 0, false, covered = true), cost(city("7", "6:40"), region("7:00", 25), regionPass = true))
         // No tariff from emHUB, no units, or a long-distance line of the same carrier: the price is a minimum.
         assertTrue(cost(city("7", "6:40"), bus("Bus 102401", "SAD Žilina a.s.", "7:00", null)).unknown)
         assertTrue(cost(region("7:00", null)).unknown)
         assertTrue(cost(region("7:00", 25, line = "602505")).unknown)
         assertFalse(cost(region("7:00", 25)).unknown)
+        // 2.18.0: a train has no price here: the buses' price, marked "+ train", and not "from" (unknown).
+        val withTrain = cost(TimetableSegment("R 845", "ŽSSK", "6:00", "A", "6:20", "B", group = "rail", vehicle = "rail"), city("7", "6:40"))
+        assertEquals(JourneyCost(27, 0, false, train = true), withTrain)
     }
 
     @Test
