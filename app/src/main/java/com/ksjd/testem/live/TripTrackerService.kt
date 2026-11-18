@@ -584,7 +584,12 @@ class TripTrackerService : Service() {
             .onFailure {
                 // Started from the background without "all the time" location: GPS only while the app is open.
                 Log.w(GPS_TAG, "location type refused (background=${Locations.hasBackground(this)}): ${it.message}")
-                ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, special)
+                runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, special) }.onFailure { refused ->
+                    // EM-0113 log: Android forbids starting it from the background here (ForegroundServiceStartNotAllowed);
+                    // that crashed the app. The followed bus is kept and resumes when the app is opened.
+                    Log.w(GPS_TAG, "foreground start refused: ${refused.message}")
+                    stopSelf()
+                }
             }.isSuccess && location != 0
         if (location != 0 && hasLocationType) Log.i(GPS_TAG, "foreground with location type")
     }
@@ -1146,7 +1151,9 @@ class TripTrackerService : Service() {
             notifyAlert(
                 "arriving",
                 getString(R.string.track_alert_arriving_title, line, ((p.secondsToBoarding + 30) / 60).coerceIn(1, lead)),
-                getString(R.string.track_alert_arriving_body, p.boardingStopName)
+                // EM-0112: without a live position it is the timetable's time; the bus may well be late.
+                getString(if (lastDetail?.let(::positionKnown) == true) R.string.track_alert_arriving_body else R.string.track_alert_arriving_body_timetable,
+                    p.boardingStopName)
             )
         }
         val alight = p.alightStopName

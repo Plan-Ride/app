@@ -526,7 +526,8 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
                     val community = trip.detail?.community
                     if (trip.ref.isScheduleOnly && community != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            DelayLabel(community.delaySeconds)
+                            // EM-0115: the bus's delay as the card has it (this phone on board is newer than the riders' last report).
+                            DelayLabel(trip.detail.delaySeconds ?: community.delaySeconds)
                             Text(
                                 " " + pluralStringResource(R.plurals.community_riders, community.reporters, community.reporters),
                                 style = MaterialTheme.typography.labelMedium,

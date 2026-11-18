@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.History
@@ -653,10 +654,16 @@ private fun ConnectionCard(
                     kinds.take(3).forEach { com.ksjd.testem.ui.components.KindIcon(it, size = 30.dp) }
                 }
                 Column(Modifier.weight(1f)) {
+                    // EM-0114: with two pictograms and a large font the arrival was cut off: shrink until both times fit.
+                    val fullSize = MaterialTheme.typography.headlineSmall.fontSize
+                    var timeSize by remember { mutableStateOf(fullSize) }
+                    var fits by remember { mutableStateOf(false) }
                     Text(
                         "${connection.departureTime} – ${connection.arrivalTime}",
-                        style = TimeStyle.copy(fontSize = MaterialTheme.typography.headlineSmall.fontSize),
-                        maxLines = 1
+                        style = TimeStyle.copy(fontSize = timeSize),
+                        maxLines = 1, softWrap = false,
+                        modifier = Modifier.drawWithContent { if (fits) drawContent() },
+                        onTextLayout = { if (it.hasVisualOverflow && timeSize.value > 12f) timeSize *= 0.92f else fits = true }
                     )
                     Text(
                         listOfNotNull(connection.totalDuration, fare.first).joinToString("  ·  "),
@@ -783,7 +790,8 @@ private fun ConnectionCard(
                         Text(" · " + stringResource(R.string.journey_following_stop))
                     }
                 } else {
-                    Button(
+                    // EM-0111: tonal, not the blue of the bus plates and pictograms above it.
+                    androidx.compose.material3.FilledTonalButton(
                         onClick = { withNotifications { haptic(Haptics.CONFIRM); TripTracking.startJourney(context, legs) } },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth().padding(end = 12.dp, top = 8.dp)
