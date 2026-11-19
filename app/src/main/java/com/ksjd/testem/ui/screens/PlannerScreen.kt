@@ -782,6 +782,10 @@ private fun ConnectionCard(
                     androidx.compose.material3.FilledTonalButton(
                         onClick = { haptic(Haptics.CONFIRM); TripTracking.stop(context, followed.ref) },
                         shape = RoundedCornerShape(12.dp),
+                        // EM-0116: followed looks different from "Follow" (it was the same grey).
+                        colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer),
                         modifier = Modifier.fillMaxWidth().padding(end = 12.dp, top = 8.dp)
                     ) {
                         androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Check, contentDescription = null)

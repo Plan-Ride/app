@@ -207,15 +207,17 @@ object OfflineTimetables {
      * the one before left. Null when no kept region has both stops.
      */
     fun search(from: CpStopSuggestion?, fromText: String, to: CpStopSuggestion?, toText: String, startS: Long,
-               changeMin: Int, limit: Int = 5, packs: List<Pack> = kept.value.keys.mapNotNull { pack(it) }): List<TimetableConnection>? {
+               changeMin: Int, limit: Int = 5, packs: List<Pack> = kept.value.keys.mapNotNull { pack(it) },
+               modes: Set<String> = com.ksjd.testem.TransportModes.ALL.toSet()): List<TimetableConnection>? {
         val p = packs.firstOrNull { stationsOf(it, from, fromText).isNotEmpty() && stationsOf(it, to, toText).isNotEmpty() }
             ?: return null
-        return searchPack(p, stationsOf(p, from, fromText), stationsOf(p, to, toText), startS, changeMin, limit)
+        return searchPack(p, stationsOf(p, from, fromText), stationsOf(p, to, toText), startS, changeMin, limit, modes)
     }
 
-    internal fun searchPack(p: Pack, a: Set<Int>, b: Set<Int>, startS: Long, changeMin: Int, limit: Int = 5): List<TimetableConnection> {
+    internal fun searchPack(p: Pack, a: Set<Int>, b: Set<Int>, startS: Long, changeMin: Int, limit: Int = 5,
+                            modes: Set<String> = com.ksjd.testem.TransportModes.ALL.toSet()): List<TimetableConnection> {
         val day0 = Instant.ofEpochSecond(startS).atZone(SK_ZONE).toLocalDate()
-        val hops = hops(p, day0)
+        val hops = hops(p, day0, modes)
         val out = ArrayList<List<Leg>>()
         var at = startS
         while (out.size < limit) {
@@ -237,8 +239,7 @@ object OfflineTimetables {
 
     private val hopsCache = HashMap<Triple<Pack, LocalDate, Set<String>>, Hops>()
 
-    private fun hops(p: Pack, day: LocalDate): Hops = synchronized(hopsCache) {
-        val allowed = com.ksjd.testem.TransportModes.planner
+    private fun hops(p: Pack, day: LocalDate, allowed: Set<String>): Hops = synchronized(hopsCache) {
         hopsCache.getOrPut(Triple(p, day, allowed)) {
             hopsCache.clear() // ponytail: one day's hops kept (a few MB); per region and day if people switch a lot
             val rows = ArrayList<LongArray>()

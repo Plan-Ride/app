@@ -1019,7 +1019,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         dateInput = state.dateInput.takeIf { d ->
             runCatching { !java.time.LocalDate.parse(d).isBefore(java.time.LocalDate.now(SK_ZONE)) }.getOrDefault(false)
         }.orEmpty(),
-        arriveBy = state.arriveBy && state.timeInput.isNotBlank()
+        arriveBy = state.arriveBy && state.timeInput.isNotBlank(),
+        modes = TransportModes.planner
     )
 
     fun loadTimetables() {

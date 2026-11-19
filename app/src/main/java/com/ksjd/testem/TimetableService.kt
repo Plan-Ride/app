@@ -24,8 +24,9 @@ class TimetableService {
         val dateInput: String = "",
         /** EM-0053: [timeInput] is when to be there. */
         val arriveBy: Boolean = false,
-        /** 2.18.0: the kinds of transport to search with (TransportModes); the planner's switches unless asked ahead for others. */
-        val modes: Set<String> = TransportModes.planner
+        /** 2.18.0: the kinds of transport to search with (TransportModes). All of them unless the planner passes its
+         *  switches: rides, reminders and the watch must not lose their bus because the planner was left on City only. */
+        val modes: Set<String> = TransportModes.ALL.toSet()
     )
 
     /** One row of a stop's departure board; [atMs] is the departure in epoch ms. */
@@ -84,7 +85,7 @@ class TimetableService {
                 if (preload) throw e
                 // 2.17.0: no connection to emHUB: the timetables kept on the phone, if they have both stops (leaving from the time).
                 val offline = com.ksjd.testem.offline.OfflineTimetables.search(request.fromSuggestion, request.fromInput,
-                    request.toSuggestion, request.toInput, a.at, changeMinutes) ?: throw e
+                    request.toSuggestion, request.toInput, a.at, changeMinutes, modes = request.modes) ?: throw e
                 TimetableSearchResult(offline.filter { !request.directOnly || it.isDirect }, null, offline = true)
             }
         }

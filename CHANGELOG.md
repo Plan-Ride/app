@@ -22,6 +22,8 @@
 - **Opens on the planner without an account** (EM-0097): with no account in the app, it now opens on Planner instead of the empty Home tab, and Back returns there. Also on the web.
 
 ### Fixed
+- **A recurring ride lost its bus**: with the planner left on City only, the morning ride (a regional bus) wasn't found. The Bus, City and Train switches now apply only to searches in the planner; recurring rides, reminders and the watch search with everything, also offline.
+- **The Follow button looked the same once followed** (EM-0116): "Following this journey" has its own colour now.
 - **The arrival time was cut off** (EM-0114): with two pictograms and a large font, a connection showed only "15:13 –". The times now shrink until both fit.
 - **Three different delays for one bus** (EM-0115): the card said +7, the opened trip +3 (from other riders) and its stops +5. The trip's header now shows the same delay as the card.
 - **"Get ready at your stop" without a live bus** (EM-0112): for a bus followed by the timetable only, the alert says it is the timetable's time and the bus may be late.
