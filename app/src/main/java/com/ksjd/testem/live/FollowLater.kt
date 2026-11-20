@@ -36,15 +36,23 @@ object FollowLater {
     val planned: StateFlow<Long?> = _planned
 
     /** When [trip] leaves the rider's stop, if known. */
-    fun departureMs(trip: TrackedTrip): Long? =
+    fun departureMs(trip: TrackedTrip, now: Long = System.currentTimeMillis()): Long? =
         trip.departsAtMs.takeIf { it > 0 } ?: trip.ref.plannedSecondOfDay.takeIf { it >= 0 }?.let { s ->
-            runCatching { LocalDate.parse(trip.ref.serviceDate).atStartOfDay(SK_ZONE).plusSeconds(s.toLong()).toInstant().toEpochMilli() }.getOrNull()
+            val date = runCatching { LocalDate.parse(trip.ref.serviceDate) }.getOrNull()
+            if (date != null) date.atStartOfDay(SK_ZONE).plusSeconds(s.toLong()).toInstant().toEpochMilli()
+            // EM-0118: a bus from sadzv's live board has no date (the board is today's): without one it counted as
+            // leaving now, so one leaving in 1.5 h was followed live at once. The day that puts it nearest to now.
+            else LocalDate.ofInstant(Instant.ofEpochMilli(now), SK_ZONE).let { today -> listOf(today.minusDays(1), today, today.plusDays(1)) }
+                .map { it.atStartOfDay(SK_ZONE).plusSeconds(s.toLong()).toInstant().toEpochMilli() }.minByOrNull { kotlin.math.abs(it - now) }
         }
 
     /** When the live notification should start, or null to start it now. */
     fun startAt(context: Context, trip: TrackedTrip, now: Long = System.currentTimeMillis()): Long? {
-        val departure = departureMs(trip) ?: return null
-        return (departure - CredentialsManager(context).getFollowLeadMinutes() * 60_000L).takeIf { it > now + 60_000L }
+        val departure = departureMs(trip, now)
+        val lead = CredentialsManager(context).getFollowLeadMinutes()
+        android.util.Log.i("FollowLater", "line ${trip.ref.line}: leaves ${departure?.let { Instant.ofEpochMilli(it).atZone(SK_ZONE).toLocalTime() } ?: "?"}, live $lead min before")
+        if (departure == null) return null
+        return (departure - lead * 60_000L).takeIf { it > now + 60_000L }
     }
 
     fun plan(context: Context, trip: TrackedTrip, at: Long) {

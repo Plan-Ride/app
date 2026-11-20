@@ -81,7 +81,7 @@ fun TopUpSheet(viewModel: AppViewModel, card: AccountDetails, onDismiss: () -> U
     LaunchedEffect(Unit) {
         runCatching { viewModel.topUpLimits() }
             .onSuccess { limits = it; euros = (it.defaultCents / 100).toString() }
-            .onFailure { error = failed }
+            .onFailure { Log.w("TopUp", "limits failed", it); error = failed }
     }
 
     gate?.let { g ->
@@ -146,7 +146,7 @@ fun TopUpSheet(viewModel: AppViewModel, card: AccountDetails, onDismiss: () -> U
                     scope.launch {
                         runCatching { viewModel.startTopUp(l, cents!!) }
                             .onSuccess { gate = it }
-                            .onFailure { error = failed }
+                            .onFailure { Log.w("TopUp", "order failed", it); error = failed }
                         busy = false
                     }
                 },
@@ -205,6 +205,10 @@ private fun PaymentPage(gate: TicketSession.PaymentGate, cookies: List<Pair<Stri
                             // The return to sadzv finishes the order in this session, as in the rider's browser.
                             cookies.forEach { (name, value) -> jar.setCookie(SADZV, "$name=$value; path=/; secure") }
                         }
+                        // Google Pay fails in a WebView (OR_BIBED_11) and Apple Pay never works on Android: card only.
+                        if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                            androidx.webkit.WebViewCompat.addDocumentStartJavaScript(this, NO_WALLETS, setOf(GPWEBPAY))
+                        }
                         // The gateway asks with JavaScript dialogs ("Cancel the payment?"), which a WebView drops without this.
                         webChromeClient = WebChromeClient()
                         webViewClient = object : WebViewClient() {
@@ -226,6 +230,8 @@ private fun PaymentPage(gate: TicketSession.PaymentGate, cookies: List<Pair<Stri
                             // Back on sadzv: give its page a moment to finish the order, then close and show the result.
                             override fun onPageFinished(view: WebView, url: String) {
                                 returned(url)
+                                // Older WebViews without document-start scripts: at least hide the Google Pay button.
+                                if (url.startsWith(GPWEBPAY)) view.evaluateJavascript(HIDE_WALLETS, null)
                                 if (outcome != null && !closing) {
                                     closing = true
                                     view.postDelayed({ close() }, 2_500)
@@ -242,3 +248,28 @@ private fun PaymentPage(gate: TicketSession.PaymentGate, cookies: List<Pair<Stri
 }
 
 private const val SADZV = "https://sadzv.qrbus.me"
+private const val GPWEBPAY = "https://3dsecure.gpwebpay.com"
+
+/** GP webpay's page draws a wallet button only for what /fe/v1/initPayment lists: take the wallets off that list. */
+private const val NO_WALLETS = """(function(){
+  var f = window.fetch, wallets = ['googlePay', 'applePay'];
+  window.fetch = function(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var p = f.apply(this, arguments);
+    if (url.indexOf('/fe/v1/initPayment') < 0) return p;
+    return p.then(function(r) {
+      return r.clone().json().then(function(j) {
+        if (j.paymentMethods) j.paymentMethods = j.paymentMethods.filter(function(m) { return wallets.indexOf(m.name) < 0; });
+        if (j.preferred) j.preferred = j.preferred.filter(function(m) { return wallets.indexOf(m) < 0; });
+        return new Response(JSON.stringify(j), {status: r.status, statusText: r.statusText, headers: r.headers});
+      }).catch(function() { return r; });
+    });
+  };
+})();"""
+
+private const val HIDE_WALLETS = """(function(){
+  if (document.getElementById('par-no-wallets')) return;
+  var s = document.createElement('style'); s.id = 'par-no-wallets';
+  s.textContent = '.custom-google-pay-button{display:none!important}';
+  document.head.appendChild(s);
+})();"""

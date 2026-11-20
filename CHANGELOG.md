@@ -22,6 +22,9 @@
 - **Opens on the planner without an account** (EM-0097): with no account in the app, it now opens on Planner instead of the empty Home tab, and Back returns there. Also on the web.
 
 ### Fixed
+- **A journey started 1.5 h early** (EM-0118): S.A.D. Zvolen's live data dates a later bus with yesterday, so a journey starting with a Banská Bystrica city bus counted that bus as gone: following went live at once and jumped to the next bus. Its stop times now go on the trip's own day, and the journey waits until shortly before it leaves, as set in Following a later bus.
+- **Add credit failed on the first tap**: right after the app started, the sign-in to S.A.D. Zvolen was often still running, and a lapsed sign-in got an empty answer instead of a request to sign in again; both showed "Could not reach sadzv". Adding credit now waits for the sign-in or signs in again.
+- **The departure board and the opened bus disagreed** (EM-0117): the board said +5 for a bus the opened trip called +3. The board worked the delay out from the countdown, which stops at "now" while the clock goes on; it now shows the bus's own delay, as the opened trip does.
 - **A recurring ride lost its bus**: with the planner left on City only, the morning ride (a regional bus) wasn't found. The Bus, City and Train switches now apply only to searches in the planner; recurring rides, reminders and the watch search with everything, also offline.
 - **The Follow button looked the same once followed** (EM-0116): "Following this journey" has its own colour now.
 - **The arrival time was cut off** (EM-0114): with two pictograms and a large font, a connection showed only "15:13 –". The times now shrink until both fit.
@@ -32,7 +35,7 @@
 - **A direct bus missing from the planner**: a bus that leaves earlier but arrives as early as a later one (line 12 at 15:50 from Nám. SNP to Zlatý Potok) was left out. (emHUB)
 - **Stops in the wrong place**: some regional lines drew a stop far from the route (Kováčová on Rožňava lines put at Park Lanice in Zvolen, Považská Bystrica station in Czechia). Such stops are now caught when timetables are loaded. (emHUB)
 - **Home and Work** (EM-0108): holding the button saved whatever was in To, unseen. It now opens a stop search to choose the place (or forget it), and the button shows the stop's own name.
-- **Google Pay when adding credit** (EM-0109): GP webpay's page inside the app refused Google Pay ("this app uses a WebView"); the app now turns on the payment support Google asks for.
+- **Adding credit pays by card only** (EM-0109): Google Pay still failed inside the app (OR_BIBED_11) and Apple Pay never works on Android, so the payment page now offers only the bank card.
 - **A connection seemed to end at the wrong stop**: a walk from the last bus to the searched stop wasn't shown, so a trip to Nám. Slobody looked like it ended at AS.
 - **The followed bus fell back to "on time"** (EM-0104): riding an early bus, the card went back to "on time" at every stop and the minutes to the next stop went up and down. The delay your phone measured at the last stop now stays until it measures the next one (emHUB's answer to the phone's own "arrived" report counts an early bus as on time and replaced it), and between stops only a bus clearly later than at its last stop counts as later.
 - **A stop the bus had left came back as the next one** (EM-0104): a few metres past a stop, or off the drawn route, the card said the bus was heading to the stop it had just left.

@@ -135,7 +135,14 @@ class LiveRepository(context: Context) {
         val timetable = rows.getOrDefault(emptyList())
         val endsHere = appContext.getString(com.ksjd.testem.R.string.board_ends_here)
         // sadzv sends Banská Bystrica's city buses without a destination (EM-0019): take it from the timetable.
-        val withDestinations = live.getOrDefault(emptyList()).map { d ->
+        // EM-0117: the delay worked out from sadzv's countdown grows once it stops at 0 ("now": +5 for a bus 3 min late);
+        // the bus's own delay (its GPS record, fresh) is what an opened trip shows, so the board shows it too.
+        val now = System.currentTimeMillis()
+        val busDelay = if (live.getOrNull().orEmpty().none { it.isRealtime }) emptyMap() else runCatching { getVehicles() }.getOrDefault(emptyList())
+            .filter { it.delaySeconds != null && now - it.reportedAtMs in -60_000L..RoutePosition.FRESH_MS }
+            .associate { (it.lineId to it.tripNumber) to it.delaySeconds!! }
+        val withDestinations = live.getOrDefault(emptyList()).map { d0 ->
+            val d = busDelay[d0.lineId to d0.tripNumber]?.takeIf { d0.isRealtime }?.let { d0.copy(delaySeconds = it) } ?: d0
             if (d.destination.isNotBlank()) d
             else timetableRow(d, timetable)?.let { r -> d.copy(destination = if (r.ends) endsHere else readable(r.destination)) } ?: d
         }
@@ -329,7 +336,7 @@ class LiveRepository(context: Context) {
                 scheduledMs = wallClockToEpochMs(o.long("departureTime") ?: 0L),
                 actualMs = actual?.times(1000L)
             )
-        }.sortedBy { it.order }
+        }.sortedBy { it.order }.let { onTripDay(it, ref.serviceDate) }
 
         val own = runCatching {
             getVehicles().firstOrNull { it.lineId == ref.lineId && it.tripNumber == ref.tripNumber }
@@ -624,3 +631,26 @@ private fun JsonArray.strAt(i: Int): String =
 
 private fun JsonArray.longAt(i: Int): Long? =
     get(i)?.takeIf { it.isJsonPrimitive }?.let { runCatching { it.asLong }.getOrNull() }
+
+/**
+ * EM-0118: sadzv's planned times carry the date of a run it already knows (13:32 of yesterday for a bus of today),
+ * so a bus 1.5 h ahead counted as gone: following started live at once and its journey jumped to the next bus.
+ * The time of day is put on the trip's day ([serviceDate], else the day that puts the trip nearest to now),
+ * a day later after midnight.
+ */
+internal fun onTripDay(stops: List<TripStop>, serviceDate: String, now: Long = System.currentTimeMillis()): List<TripStop> {
+    val first = stops.firstOrNull { it.scheduledMs > 0 } ?: return stops
+    fun tod(ms: Long) = java.time.Instant.ofEpochMilli(ms).atZone(com.ksjd.testem.SK_ZONE).toLocalTime().toSecondOfDay().toLong()
+    val day = runCatching { LocalDate.parse(serviceDate) }.getOrNull()
+        ?: java.time.Instant.ofEpochMilli(now).atZone(com.ksjd.testem.SK_ZONE).toLocalDate().let { today -> listOf(today.minusDays(1), today, today.plusDays(1)) }
+            .minByOrNull { abs(it.atStartOfDay(com.ksjd.testem.SK_ZONE).toInstant().toEpochMilli() + tod(first.scheduledMs) * 1000 - now) }!!
+    var base = day.atStartOfDay(com.ksjd.testem.SK_ZONE).toInstant().toEpochMilli()
+    var last = -1L
+    return stops.map { s ->
+        if (s.scheduledMs <= 0) return@map s
+        val t = tod(s.scheduledMs)
+        if (last >= 0 && t < last - 6 * 3600) base += 86_400_000L  // past midnight
+        last = t
+        s.copy(scheduledMs = base + t * 1000)
+    }
+}

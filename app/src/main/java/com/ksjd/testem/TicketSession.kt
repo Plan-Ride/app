@@ -215,8 +215,9 @@ class TicketSession(
     data class PaymentGate(val url: String, val fields: List<Pair<String, String>>, val returnUrl: String)
 
     suspend fun topUpLimits(): TopUpLimits = signedIn {
+        // A lapsed session gets 200 with "[]" here instead of the login page.
         val tariffId = JsonParser.parseString(getJson("$sessionBaseUrl/accountapi/getCardDepositTariff", "$sessionBaseUrl/account"))
-            .asJsonObject.get("tariffId").asInt
+            .takeIf { it.isJsonObject }?.asJsonObject?.get("tariffId")?.asInt ?: throw SessionExpiredException()
         val props = JsonParser.parseString(getJson("$sessionBaseUrl/ticketapi/getTariffInformation/$tariffId", "$sessionBaseUrl/account"))
             .asJsonObject.arr("properties")?.map { it.asJsonObject }.orEmpty()
         fun cents(name: String, default: Int) = props.firstOrNull { it.str("name") == name }?.str("valueText")?.toIntOrNull() ?: default

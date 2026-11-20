@@ -56,4 +56,27 @@ class SearchCacheTest {
             SavedRoute("slovensko", "A", "Old"), SavedRoute(PLANNER_ALL, "A", "C"), SavedRoute(PLANNER_ALL, "A", "D"))
         assertEquals(listOf("B", "C"), AppViewModel.guesses("A", routes).map { it.toText })
     }
+
+    /** EM-0118: a board bus without a date leaves today at its time, not "now". */
+    @Test
+    fun undatedBoardBusLeavesAtItsTime() {
+        val now = java.time.ZonedDateTime.of(2026, 11, 20, 12, 4, 0, 0, SK_ZONE).toInstant().toEpochMilli()
+        val trip = TrackedTrip(TripRef("60101", 1, "", 1, "Zvolen", plannedSecondOfDay = 13 * 3600 + 45 * 60), emptyList())
+        assertEquals(now + (101 * 60_000L), com.ksjd.testem.live.FollowLater.departureMs(trip, now))
+        val late = TrackedTrip(TripRef("1", 1, "", 1, "X", plannedSecondOfDay = 10 * 60), emptyList())  // 00:10, asked at 23:55
+        val night = java.time.ZonedDateTime.of(2026, 11, 20, 23, 55, 0, 0, SK_ZONE).toInstant().toEpochMilli()
+        assertEquals(night + 15 * 60_000L, com.ksjd.testem.live.FollowLater.departureMs(late, night))
+    }
+
+    /** EM-0118: sadzv dated today's 13:32 bus with yesterday: its stops go on today, and after midnight on the next day. */
+    @Test
+    fun sadzvStopsGoOnTheTripDay() {
+        fun at(d: Int, h: Int, m: Int) = java.time.ZonedDateTime.of(2026, 11, d, h, m, 0, 0, SK_ZONE).toInstant().toEpochMilli()
+        fun stop(ms: Long) = com.ksjd.testem.live.TripStop("S", 1, 1, ms, null)
+        val now = at(20, 12, 4)
+        val stops = com.ksjd.testem.live.onTripDay(listOf(stop(at(19, 13, 16)), stop(at(19, 13, 32))), "", now)
+        assertEquals(listOf(at(20, 13, 16), at(20, 13, 32)), stops.map { it.scheduledMs })
+        val dated = com.ksjd.testem.live.onTripDay(listOf(stop(at(19, 23, 50)), stop(at(19, 0, 10))), "2026-11-20", now)
+        assertEquals(listOf(at(20, 23, 50), at(21, 0, 10)), dated.map { it.scheduledMs })
+    }
 }

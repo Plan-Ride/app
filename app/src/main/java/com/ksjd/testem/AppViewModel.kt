@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -450,11 +451,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    suspend fun topUpLimits(): TicketSession.TopUpLimits = (session ?: throw java.io.IOException("Signed out")).topUpLimits()
+    /** Top-up right after the app starts: the saved sign-in may still be running, or have failed; wait for or redo it. */
+    private suspend fun signedInSession(): TicketSession {
+        session?.let { return it }
+        if (!hasSavedCredentials()) throw java.io.IOException("Signed out")
+        loginWithSavedCredentials()
+        _appState.first { !it.isLoading }
+        return session ?: throw java.io.IOException("Signed out")
+    }
+
+    suspend fun topUpLimits(): TicketSession.TopUpLimits = signedInSession().topUpLimits()
 
     /** Creates the top-up order for the selected card; the rider pays it on the returned page. */
     suspend fun startTopUp(limits: TicketSession.TopUpLimits, cents: Int): TicketSession.PaymentGate {
-        val current = session ?: throw java.io.IOException("Signed out")
+        val current = signedInSession()
         return current.startTopUp(current.activeSnr, limits.tariffId, cents)
     }
 
