@@ -14,6 +14,7 @@ class IdsTest {
         assertEquals(Wallet.IDS, WalletRule.forLine("60101", "S.A.D. Zvolen a.s."))
         assertEquals(Wallet.IDS, WalletRule.forLine("Bus 060400"))
         assertNull(WalletRule.forLine("609503"))  // long-distance: the default ticket
+        assertNull(WalletRule.forLine("R 842"))  // EM-0119: a train, not Zvolen's city line 842
     }
 
     @Test

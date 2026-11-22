@@ -120,11 +120,12 @@ object FollowLater {
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val rail = com.ksjd.testem.ui.components.lineKind(trip.ref.line) == "rail" // EM-0119
         val notification = NotificationCompat.Builder(context, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_bus)
+            .setSmallIcon(if (rail) R.drawable.ic_stat_train else R.drawable.ic_stat_bus)
             .setContentTitle(context.getString(R.string.follow_planned_title, trip.ref.line, time))
             .setContentText(
-                if (due) context.getString(R.string.follow_planned_due)
+                if (due) context.getString(if (rail) R.string.follow_planned_due_train else R.string.follow_planned_due)
                 else context.getString(R.string.follow_planned_body, trip.ref.destination, clock(_planned.value ?: departure))
             )
             .setContentIntent(open)

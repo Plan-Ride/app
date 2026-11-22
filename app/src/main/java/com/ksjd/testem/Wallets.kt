@@ -16,6 +16,7 @@ object WalletRule {
     fun forLine(line: String, operator: String = ""): Wallet? {
         val number = line.trim().substringAfterLast(' ')
         return when {
+            com.ksjd.testem.ui.components.lineKind(line) == "rail" -> null  // EM-0119: "R 842" isn't Zvolen's city line 842
             operator.startsWith("MHD Banská Bystrica") || operator.startsWith("MHD Zvolen") -> Wallet.SADZV
             idsLine.matches(number) -> Wallet.IDS
             cityLine.matches(number) -> Wallet.SADZV  // the only city lines the app knows are sadzv's (BB, Zvolen)

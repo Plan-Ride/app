@@ -222,7 +222,7 @@ private fun LiveCard(context: Context, view: FollowView?, now: Long, colors: Car
                 }
             }
             if (summary.stopsAway > 0) {
-                Text(context.resources.getQuantityString(R.plurals.follow_stops_away, summary.stopsAway, summary.stopsAway),
+                Text(summary.stopsAwayText(context),
                     style = TextStyle(color = onDim, fontSize = 12.sp), modifier = GlanceModifier.padding(top = 4.dp))
             }
             Spacer(GlanceModifier.height(6.dp))
@@ -263,7 +263,7 @@ private fun Track(summary: FollowSummary, colors: CardColors) {
                 }
                 if (i == bus) {
                     Box(GlanceModifier.size(22.dp).cornerRadius(11.dp).background(FixedColor(colors.on)), contentAlignment = Alignment.Center) {
-                        Image(ImageProvider(R.drawable.ic_stat_bus), contentDescription = null, modifier = GlanceModifier.size(14.dp),
+                        Image(ImageProvider(if (summary.kind == "rail") R.drawable.ic_stat_train else R.drawable.ic_stat_bus), contentDescription = null, modifier = GlanceModifier.size(14.dp),
                             colorFilter = ColorFilter.tint(FixedColor(colors.primary)))
                     }
                 } else {

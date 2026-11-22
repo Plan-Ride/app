@@ -194,7 +194,8 @@ private fun draw(
             position = along(listOf(a) + roads[from].orEmpty() + b, f)
             title = ref.line
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            icon = androidx.core.content.ContextCompat.getDrawable(map.context, R.drawable.ic_stat_bus)?.mutate()?.let { bus ->
+            icon = androidx.core.content.ContextCompat.getDrawable(map.context,
+                if (com.ksjd.testem.ui.components.lineKind(ref.line, vehicle = detail.vehicle) == "rail") R.drawable.ic_stat_train else R.drawable.ic_stat_bus) /* EM-0119 */?.mutate()?.let { bus ->
                 bus.setTint(surface)
                 android.graphics.drawable.LayerDrawable(arrayOf(dot(primary, surface, 30, map.context.resources.displayMetrics.density), bus)).apply {
                     val inset = (7 * map.context.resources.displayMetrics.density).toInt()

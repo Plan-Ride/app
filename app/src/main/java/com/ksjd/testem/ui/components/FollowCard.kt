@@ -224,7 +224,7 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                         ) { Text(stringResource(R.string.follow_exact_allow), color = on) }
                     }
                 } else if (p == null) {
-                    Text(stringResource(R.string.track_loading), color = on.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(if (lineKind(trip.ref.line) == "rail") R.string.track_loading_train else R.string.track_loading), color = on.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyLarge)
                 } else {
                     val summary = followSummary(context, view, now)
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -239,7 +239,7 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                     Spacer(Modifier.height(8.dp))
                     DelayPill(summary, on)
                     Spacer(Modifier.height(16.dp))
-                    RouteTrack(view, on)
+                    RouteTrack(view, on, summary)
                     Spacer(Modifier.height(6.dp))
                     Row {
                         Text(summary.from, color = on.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium,
@@ -380,8 +380,16 @@ data class FollowSummary(
     val hops: Int,
     val position: Float,
     val from: String,
-    val to: String
-)
+    val to: String,
+    /** EM-0119: "rail", "tram", "bus"…, for the pictogram on the track and "The train is 2 stops away". */
+    val kind: String = "bus"
+) {
+    fun stopsAwayText(context: android.content.Context): String = context.resources.getQuantityString(when (kind) {
+        "rail" -> R.plurals.follow_stops_away_train
+        "tram" -> R.plurals.follow_stops_away_tram
+        else -> R.plurals.follow_stops_away
+    }, stopsAway, stopsAway)
+}
 
 fun followSummary(context: android.content.Context, view: FollowView, now: Long): FollowSummary {
     val p = view.progress
@@ -416,7 +424,8 @@ fun followSummary(context: android.content.Context, view: FollowView, now: Long)
         hops = end - start,
         position = (p.position - start).coerceIn(0f, (end - start).toFloat()),
         from = p.boardingStopName,
-        to = p.alightStopName ?: p.lastStopName
+        to = p.alightStopName ?: p.lastStopName,
+        kind = lineKind(view.trip.ref.line, vehicle = view.detail.vehicle)
     )
 }
 
@@ -452,7 +461,7 @@ private fun DelayPill(summary: FollowSummary, on: Color) {
  * between updates. Before it reaches your stop it waits, faded, at the start, with how many stops away it is.
  */
 @Composable
-private fun RouteTrack(view: FollowView, on: Color) {
+private fun RouteTrack(view: FollowView, on: Color, summary: FollowSummary) {
     val p = view.progress
     val last = (view.detail.stops.size - 1).coerceAtLeast(1)
     val start = (p.boardingIndex ?: 0).coerceIn(0, last - 1)
@@ -462,7 +471,7 @@ private fun RouteTrack(view: FollowView, on: Color) {
     val position by animateFloatAsState(target, tween(1400, easing = FastOutSlowInEasing), label = "bus")
     val away = kotlin.math.ceil(start - p.position).toInt()
     if (away > 0) {
-        Text(androidx.compose.ui.res.pluralStringResource(R.plurals.follow_stops_away, away, away),
+        Text(summary.copy(stopsAway = away).stopsAwayText(androidx.compose.ui.platform.LocalContext.current),
             color = on.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium)
         Spacer(Modifier.height(6.dp))
     }
@@ -487,7 +496,7 @@ private fun RouteTrack(view: FollowView, on: Color) {
             contentAlignment = Alignment.Center) {
             Box(Modifier.size(marker).scale(ring).clip(CircleShape).background(on.copy(alpha = ringAlpha)))
             Box(Modifier.size(marker).clip(CircleShape).background(on), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.DirectionsBus, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Icon(kindIcon(summary.kind), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             }
         }
     }

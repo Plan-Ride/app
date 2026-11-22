@@ -30,7 +30,7 @@ object OngoingFollow {
         )
         val title = context.getString(R.string.line_to, f.line, f.destination)
         val builder = NotificationCompat.Builder(context, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_bus)
+            .setSmallIcon(vehicleIcon(f.line))
             .setContentTitle(title)
             .setContentText(listOf(countdown(context, f.targetMs, System.currentTimeMillis()), f.caption).filter { it.isNotBlank() }.joinToString(" "))
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
@@ -47,7 +47,7 @@ object OngoingFollow {
             .addPart("time", Status.TimerPart(zero))
             .build()
         OngoingActivity.Builder(context, ID, builder)
-            .setStaticIcon(R.drawable.ic_stat_bus)
+            .setStaticIcon(vehicleIcon(f.line))
             .setTouchIntent(open)
             .setStatus(status)
             .build()
@@ -91,3 +91,7 @@ object OngoingFollow {
         runCatching { NotificationManagerCompat.from(context).notify(buzz.id, notification) }
     }
 }
+
+/** EM-0119: a followed train shows a train ("R 842", "Os 7336": trains are written with their kind in front). */
+private val RAIL_LINE = Regex("^(Os|R|REX|RR|Ex|IC|EC|EN|SC|RJ|LE|ZR|Zr|Sp|Sv|Mn|Rx|RE|ICE|NJ|D)\\s*\\d+.*")
+fun vehicleIcon(line: String): Int = if (RAIL_LINE.matches(line.trim())) R.drawable.ic_stat_train else R.drawable.ic_stat_bus

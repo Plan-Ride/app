@@ -561,7 +561,8 @@ class TripTrackerService : Service() {
         trip = leg
         TripTracking.set(this@TripTrackerService, leg)
         resetTripState()
-        notifyAlert("change", getString(R.string.journey_change_title, leg.ref.line), getString(R.string.journey_change_body, changeStop))
+        notifyAlert("change", getString(kindText(leg.ref.line, R.string.journey_change_title, R.string.journey_change_title_train), leg.ref.line),
+            getString(kindText(leg.ref.line, R.string.journey_change_body, R.string.journey_change_body_train), changeStop))
         NotificationManagerCompat.from(this).notifySafely(NOTIFICATION_ID, placeholderNotification(leg))
     }
 
@@ -989,7 +990,8 @@ class TripTrackerService : Service() {
             )
             CatchEstimate.Verdict.Miss -> notifyAlert(
                 "catch_miss", getString(R.string.catch_alert_miss_title, current.ref.line),
-                getString(if (car()) R.string.catch_alert_car_miss_body else R.string.catch_alert_miss_body, walk)
+                getString(if (car()) kindText(current.ref.line, R.string.catch_alert_car_miss_body, R.string.catch_alert_car_miss_body_train)
+                    else kindText(current.ref.line, R.string.catch_alert_miss_body, R.string.catch_alert_miss_body_train), walk)
             )
             else -> Unit
         }
@@ -1046,7 +1048,7 @@ class TripTrackerService : Service() {
                         changeTo(next, current.nextLegs.drop(1), progress.lastStopName)
                         continue
                     }
-                    notifyAlert("arrived", getString(R.string.track_arrived_title), getString(R.string.track_arrived_body, progress.lastStopName))
+                    notifyAlert("arrived", getString(R.string.track_arrived_title), getString(kindText(current.ref.line, R.string.track_arrived_body, R.string.track_arrived_body_train), progress.lastStopName))
                     finish()
                     return
                 }
@@ -1134,7 +1136,7 @@ class TripTrackerService : Service() {
         )
         notifyAlert(
             "transfer_risk", getString(R.string.transfer_risk_title, next.ref.line),
-            getString(R.string.transfer_risk_body, (detail.delaySeconds ?: 0) / 60, changeStop,
+            getString(kindText(trip?.ref?.line, R.string.transfer_risk_body, R.string.transfer_risk_body_train), (detail.delaySeconds ?: 0) / 60, changeStop,
                 com.ksjd.testem.ui.Format.clock(arrival), next.ref.line, com.ksjd.testem.ui.Format.clock(departure)),
             tap = replan
         )
@@ -1142,7 +1144,9 @@ class TripTrackerService : Service() {
 
     /** "Then bus 101 → Krupina" on a journey with changes. */
     private fun thenLine(trip: TrackedTrip): String? =
-        trip.nextLegs.firstOrNull()?.let { getString(R.string.journey_then, it.ref.line, it.ref.destination) }
+        trip.nextLegs.firstOrNull()?.let {
+            getString(kindText(it.ref.line, R.string.journey_then, R.string.journey_then_train), it.ref.line, it.ref.destination)
+        }
 
     private fun sendAlerts(trip: TrackedTrip, p: TripProgress) {
         val line = trip.ref.line
@@ -1150,9 +1154,10 @@ class TripTrackerService : Service() {
         if (!p.onBoard && p.secondsToBoarding in 0..lead * 60) {
             notifyAlert(
                 "arriving",
-                getString(R.string.track_alert_arriving_title, line, ((p.secondsToBoarding + 30) / 60).coerceIn(1, lead)),
+                getString(kindText(line, R.string.track_alert_arriving_title, R.string.track_alert_arriving_title_train), line, ((p.secondsToBoarding + 30) / 60).coerceIn(1, lead)),
                 // EM-0112: without a live position it is the timetable's time; the bus may well be late.
-                getString(if (lastDetail?.let(::positionKnown) == true) R.string.track_alert_arriving_body else R.string.track_alert_arriving_body_timetable,
+                getString(if (lastDetail?.let(::positionKnown) == true) R.string.track_alert_arriving_body
+                    else kindText(line, R.string.track_alert_arriving_body_timetable, R.string.track_alert_arriving_body_timetable_train),
                     p.boardingStopName)
             )
         }
@@ -1162,7 +1167,7 @@ class TripTrackerService : Service() {
             val next = trip.nextLegs.firstOrNull()
             notifyAlert(
                 "alight", getString(R.string.track_alert_alight_title),
-                if (next != null) getString(R.string.journey_alight_change, alight, next.ref.line)
+                if (next != null) getString(kindText(next.ref.line, R.string.journey_alight_change, R.string.journey_alight_change_train), alight, next.ref.line)
                 else getString(R.string.track_alert_alight_body, alight)
             )
         }
@@ -1186,9 +1191,15 @@ class TripTrackerService : Service() {
         return NotificationCompat.Action(0, getString(R.string.track_stop), stop)
     }
 
+    /** EM-0119: a train's notifications show a train and say "train", not "bus". */
+    private fun rail(line: String?, vehicle: String = "") = line != null && com.ksjd.testem.ui.components.lineKind(line, vehicle = vehicle) == "rail"
+    private fun vehicleIcon(line: String?, vehicle: String = ""): Int = if (rail(line, vehicle)) R.drawable.ic_stat_train else R.drawable.ic_stat_bus
+    /** [bus] or its "_train" twin [train] for [line]. */
+    private fun kindText(line: String?, bus: Int, train: Int) = if (rail(line)) train else bus
+
     private fun baseBuilder(trip: TrackedTrip): NotificationCompat.Builder =
         NotificationCompat.Builder(this, CHANNEL_LIVE)
-            .setSmallIcon(R.drawable.ic_stat_bus)
+            .setSmallIcon(vehicleIcon(trip.ref.line))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -1201,7 +1212,7 @@ class TripTrackerService : Service() {
             .setContentTitle(getString(R.string.track_title, trip.ref.line, trip.ref.destination))
 
     private fun placeholderNotification(trip: TrackedTrip) =
-        baseBuilder(trip).setContentText(getString(R.string.track_loading)).build()
+        baseBuilder(trip).setContentText(getString(kindText(trip.ref.line, R.string.track_loading, R.string.track_loading_train))).build()
 
     private fun liveNotification(trip: TrackedTrip, detail: TripDetail, p: TripProgress, catchLine: String? = null): android.app.Notification {
         val builder = baseBuilder(trip)
@@ -1287,8 +1298,8 @@ class TripTrackerService : Service() {
                 leavingPressed -> listOfNotNull(detail.stops.getOrNull(boarding + 1)?.let {
                     action(REQUEST_REPORT_NEXT, getString(R.string.community_at, short(it.name)), boarding + 1)
                 })
-                herePressed -> listOf(action(REQUEST_REPORT_LEAVING, getString(R.string.community_bus_leaving), boarding, leaving = true))
-                else -> listOf(action(REQUEST_REPORT_HERE, getString(R.string.community_bus_here), boarding))
+                herePressed -> listOf(action(REQUEST_REPORT_LEAVING, getString(kindText(trip?.ref?.line, R.string.community_bus_leaving, R.string.community_bus_leaving_train)), boarding, leaving = true))
+                else -> listOf(action(REQUEST_REPORT_HERE, getString(kindText(trip?.ref?.line, R.string.community_bus_here, R.string.community_bus_here_train)), boarding))
             }
         }
         return buildList {
@@ -1310,7 +1321,7 @@ class TripTrackerService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return listOf(
-            NotificationCompat.Action(0, getString(R.string.community_bus_here), here),
+            NotificationCompat.Action(0, getString(kindText(trip?.ref?.line, R.string.community_bus_here, R.string.community_bus_here_train)), here),
             NotificationCompat.Action(0, getString(R.string.community_bus_gone), gone)
         )
     }
@@ -1321,7 +1332,7 @@ class TripTrackerService : Service() {
         val primary = ContextCompat.getColor(this, R.color.track_primary)
         val style = NotificationCompat.ProgressStyle()
             .setStyledByProgress(true)
-            .setProgressTrackerIcon(IconCompat.createWithResource(this, R.drawable.ic_stat_bus))
+            .setProgressTrackerIcon(IconCompat.createWithResource(this, vehicleIcon(trip?.ref?.line, detail.vehicle)))
             // Android draws at most 10 segments and merges the rest into one (logging a warning each time).
             .setProgressSegments(
                 if (hops <= MAX_SEGMENTS) List(hops) { NotificationCompat.ProgressStyle.Segment(STEPS_PER_HOP).setColor(primary) }
@@ -1357,7 +1368,7 @@ class TripTrackerService : Service() {
         TripTracking.recordAlert(this, key, title, body)
         val channel = com.ksjd.testem.reminders.AlertSound.channel(this, CHANNEL_ALERTS, getString(R.string.track_channel_alerts))
         val notification = NotificationCompat.Builder(this, channel)
-            .setSmallIcon(R.drawable.ic_stat_bus)
+            .setSmallIcon(vehicleIcon(trip?.ref?.line))
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

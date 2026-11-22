@@ -41,7 +41,7 @@ class CountdownComplication : SuspendingComplicationDataSourceService() {
         val open = PendingIntent.getActivity(this, 2, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return ShortTextComplicationData.Builder(countdown, PlainComplicationText.Builder(getString(R.string.line_countdown, line)).build())
             .setTitle(PlainComplicationText.Builder(line).build())
-            .setMonochromaticImage(MonochromaticImage.Builder(Icon.createWithResource(this, R.drawable.ic_stat_bus)).build())
+            .setMonochromaticImage(MonochromaticImage.Builder(Icon.createWithResource(this, vehicleIcon(line))).build())
             .setTapAction(open)
             .build()
     }

@@ -70,7 +70,7 @@
     <string name="ticket_card_switch">Card</string>
     <string name="ticket_next_from">Next from %1$s</string>
     <string name="ticket_next_buses">Next buses</string>
-    <string name="ticket_next_hint">Star a stop in Departures to see its next buses here.</string>
+    <string name="ticket_next_hint">Star a stop in Departures to see its next departures here.</string>
     <string name="low_credit_message">Credit is low: %1$s. Top up before your next trip.</string>
     <string name="qr_code_content_desc">Ticket QR code. Tap to show full screen.</string>
     <string name="qr_code_fullscreen_content_desc">Ticket QR code</string>
@@ -255,28 +255,34 @@
     </plurals>
     <!-- Bus tracking -->
     <string name="track_start">Follow this bus</string>
+    <string name="track_start_train">Follow this train</string>
     <string name="track_stop">Stop following</string>
     <string name="track_following">You’re following this bus. Tap a stop to get an alert before you get off there.</string>
+    <string name="track_following_train">You’re following this train. Tap a stop to get an alert before you get off there.</string>
     <string name="track_your_stop">Your stop</string>
     <string name="track_set_stop">Get off here</string>
     <string name="track_permission_needed">Allow notifications to follow a bus.</string>
     <string name="track_title">%1$s → %2$s</string>
     <string name="track_loading">Getting the bus position…</string>
+    <string name="track_loading_train">Getting the train position…</string>
     <string name="track_waiting_text">Departs %1$s from %2$s</string>
     <string name="track_next_title">Next: %1$s at %2$s</string>
     <string name="track_now_at">Now at: %1$s</string>
     <string name="track_get_off_at">You get off at: %1$s</string>
     <string name="track_alert_arriving_title">Bus %1$s arrives in %2$d min</string>
+    <string name="track_alert_arriving_title_train">Train %1$s arrives in %2$d min</string>
     <string name="track_alert_arriving_body">Get ready at %1$s.</string>
     <string name="track_alert_alight_title">Get off at the next stop</string>
     <string name="track_alert_alight_body">Next stop: %1$s</string>
     <string name="track_arrived_title">You’ve arrived</string>
     <string name="track_arrived_body">The bus reached %1$s. Following has stopped.</string>
-    <string name="track_channel_live">Followed bus</string>
-    <string name="track_channel_alerts">Bus alerts</string>
+    <string name="track_arrived_body_train">The train reached %1$s. Following has stopped.</string>
+    <string name="track_channel_live">Followed ride</string>
+    <string name="track_channel_alerts">Ride alerts</string>
     <string name="track_schedule_only">Timetable times, no live position</string>
     <string name="planner_show_stops">Show all stops</string>
     <string name="community_bus_here">Bus is here</string>
+    <string name="community_bus_here_train">Train is here</string>
     <string name="community_at">At %1$s</string>
     <string name="community_still_at">Still at %1$s</string>
     <string name="community_thanks">Thanks, shared with other riders</string>
@@ -291,6 +297,7 @@
     <string name="catch_alert_leave_body">It\'s about %1$d min on foot to %2$s.</string>
     <string name="catch_alert_miss_title">You\'ll probably miss line %1$s</string>
     <string name="catch_alert_miss_body">It\'s about %1$d min on foot and the bus leaves sooner. Check the next departure.</string>
+    <string name="catch_alert_miss_body_train">It\'s about %1$d min on foot and the train leaves sooner. Check the next departure.</string>
     <string name="privacy_title">Two optional features</string>
     <string name="privacy_community_title">Help with bus positions</string>
     <string name="privacy_community_body">Many buses don\'t report where they are. Riders can: with buttons on the follow notification, or automatically from their phone while riding. Only the bus, the stop and the time are sent, with a random ID that changes for every bus. Never your location.</string>
@@ -362,6 +369,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="arrival_alert_custom_label">Minutes (1–60)</string>
     <string name="catch_location_allow">Allow</string>
     <string name="community_bus_leaving">Bus is leaving</string>
+    <string name="community_bus_leaving_train">Train is leaving</string>
     <string name="support_title">Support Plan&amp;Ride</string>
     <string name="support_hint">Help keep the app free and improving</string>
     <string name="support_body">Plan&amp;Ride is free and open source, built in spare time. If it makes your trips easier, you can support further work on the project with a small contribution. It is completely voluntary and changes nothing in the app.</string>
@@ -391,9 +399,13 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="journey_start">Follow</string>
     <string name="journey_clear">Clear</string>
     <string name="journey_then">Then bus %1$s → %2$s</string>
+    <string name="journey_then_train">Then train %1$s → %2$s</string>
     <string name="journey_change_title">Change to bus %1$s</string>
+    <string name="journey_change_title_train">Change to train %1$s</string>
     <string name="journey_change_body">Get off at %1$s. Now following your next bus.</string>
+    <string name="journey_change_body_train">Get off at %1$s. Now following your next train.</string>
     <string name="journey_alight_change">Get off at %1$s and change to bus %2$s</string>
+    <string name="journey_alight_change_train">Get off at %1$s and change to train %2$s</string>
     <string name="follow_live">Live</string>
     <string name="follow_timetable">Timetable</string>
     <string name="follow_until_departure">until it leaves %1$s</string>
@@ -402,15 +414,23 @@ On the next screen, choose “Allow all the time”.</string>
         <item quantity="one">The bus is %1$d stop away</item>
         <item quantity="other">The bus is %1$d stops away</item>
     </plurals>
+    <plurals name="follow_stops_away_train">
+        <item quantity="one">The train is %1$d stop away</item>
+        <item quantity="other">The train is %1$d stops away</item>
+    </plurals>
+    <plurals name="follow_stops_away_tram">
+        <item quantity="one">The tram is %1$d stop away</item>
+        <item quantity="other">The tram is %1$d stops away</item>
+    </plurals>
     <string name="pin_show">Show PIN</string>
     <string name="pin_hide">Hide PIN</string>
     <string name="board_ends_here">Ends here</string>
-    <string name="widget_description">The bus you follow, your starred journeys and the next buses at your favourite stops</string>
+    <string name="widget_description">The ride you follow, your starred journeys and the next departures at your favourite stops</string>
     <string name="widget_empty">Star a stop or a journey in the app, and it shows here.</string>
     <string name="widget_follow">Follow</string>
     <string name="widget_updated">Updated %1$s</string>
-    <string name="change_time">Time to change buses</string>
-    <string name="change_time_hint">The planner shows changes only with at least this much time between the two buses. A shorter time finds more connections; a longer one is safer when a bus runs late.</string>
+    <string name="change_time">Time to change</string>
+    <string name="change_time_hint">The planner shows changes only with at least this much time between the two rides. A shorter time finds more connections; a longer one is safer when one runs late.</string>
     <string name="change_time_any">Any (even 0 min)</string>
     <string name="change_time_minutes">At least %1$d min</string>
     <string name="community_bus_gone">It already left</string>
@@ -425,7 +445,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="transfer_walk">walk %1$d min</string>
     <string name="transfer_step_off">Where you get off %1$s</string>
     <string name="transfer_step_on">Where you get on the next bus</string>
-    <string name="transfer_no_stops">This bus has no stop list to choose from.</string>
+    <string name="transfer_no_stops">This ride has no stop list to choose from.</string>
     <string name="transfer_now">now</string>
     <string name="transfer_here">here</string>
     <string name="transfer_other_stop">Another stop…</string>
@@ -433,7 +453,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="transfer_then">Then</string>
     <string name="transfer_off_at">get off at %1$s at %2$s</string>
     <string name="transfer_arrive">You arrive at %1$s (%2$s)</string>
-    <string name="transfer_none_from">No bus from there to your destination today. Try another stop.</string>
+    <string name="transfer_none_from">Nothing goes from there to your destination today. Try another stop.</string>
     <string name="transfer_apply">Use this change</string>
     <string name="haptics_switch">Haptic feedback</string>
     <string name="haptics_switch_hint">A short vibration on taps and when something is done, like following a bus</string>
@@ -465,6 +485,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="home_following">Following</string>
     <string name="home_also_following">Also following</string>
     <string name="track_following_later">You’re following this bus too. It takes over the notification when the bus before it ends or you stop following that one.</string>
+    <string name="track_following_later_train">You’re following this train too. It takes over the notification when the ride before it ends or you stop following that one.</string>
     <string name="home_journey_underway">Underway</string>
     <string name="home_journey_in">in %1$s</string>
     <string name="day_today">Today</string>
@@ -522,11 +543,11 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="rides_repeat">Repeat this ride regularly</string>
     <string name="rides_channel">Regular rides</string>
     <string name="rides_due_title">%1$s is due</string>
-    <string name="rides_due_body">Your %1$s bus. Tap to follow it.</string>
+    <string name="rides_due_body">Your %1$s ride. Tap to follow it.</string>
     <string name="rides_busy_title">%1$s not followed</string>
-    <string name="rides_busy_body">You were already following another bus.</string>
-    <string name="rides_finding">Finding your %1$s bus…</string>
-    <string name="rides_missing_title">%1$s: bus not found</string>
+    <string name="rides_busy_body">You were already following another ride.</string>
+    <string name="rides_finding">Finding your %1$s ride…</string>
+    <string name="rides_missing_title">%1$s: ride not found</string>
     <string name="rides_missing_body">There’s no %1$s connection today. Check the planner.</string>
     <string name="analytics_switch">Usage statistics</string>
     <string name="analytics_switch_hint">Anonymous app usage via Google Firebase Analytics, to see what to improve. No account data or location.</string>
@@ -592,6 +613,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="ticket_default_change">Change</string>
     <string name="transfer_risk_title">You may miss line %1$s</string>
     <string name="transfer_risk_body">This bus is about %1$d min late: at %2$s around %3$s, but line %4$s leaves at %5$s. Tap to see other ways from there.</string>
+    <string name="transfer_risk_body_train">This train is about %1$d min late: at %2$s around %3$s, but line %4$s leaves at %5$s. Tap to see other ways from there.</string>
     <string name="watch_report_channel">Reports from the watch</string>
     <string name="watch_report_title">Watch logs received</string>
     <string name="watch_report_body">Tap to describe the problem and send the report with the watch\'s logs.</string>
@@ -639,14 +661,14 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="leave_by_setting">Leave by for starred journeys</string>
     <string name="leave_by_setting_hint">From 40 min before a starred journey: when to leave for the stop, as late as the bus is, and \"Leave now\" when it\'s time</string>
     <string name="stop_widget_label">Departures from a stop</string>
-    <string name="stop_widget_description">The next buses from your favourite stops. Tap the stop name to switch.</string>
-    <string name="stop_widget_empty">Star a stop in Departures to see its buses here.</string>
+    <string name="stop_widget_description">The next departures from your favourite stops. Tap the stop name to switch.</string>
+    <string name="stop_widget_empty">Star a stop in Departures to see its departures here.</string>
     <string name="stop_widget_failed">Couldn\'t load departures. Tap ↻ to try again.</string>
-    <string name="stop_widget_none">No more buses today.</string>
+    <string name="stop_widget_none">Nothing more leaves today.</string>
     <string name="busmap_open">Map</string>
     <string name="busmap_title">%1$s → %2$s</string>
-    <string name="busmap_unavailable">There\'s no map for this bus: its stops\' positions aren\'t known.</string>
-    <string name="share_trip">Share this bus</string>
+    <string name="busmap_unavailable">There\'s no map for this ride: its stops\' positions aren\'t known.</string>
+    <string name="share_trip">Share this ride</string>
     <string name="share_trip_text">Line %1$s to %2$s. Watch it live in Plan&amp;Ride: %3$s</string>
     <string name="month_spent">spent %1$s</string>
     <string name="month_added">added %1$s</string>
@@ -704,16 +726,17 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="watch_install_failed">The watch didn\'t respond. Open the Play Store on the watch and search for Plan&amp;Ride.</string>
     <string name="planner_arrive_by">Arrive by</string>
     <string name="planner_arrive_at_time">There by %1$s</string>
-    <string name="follow_planned_channel">Followed buses later on</string>
+    <string name="follow_planned_channel">Followed rides later on</string>
     <string name="follow_planned_title">Following line %1$s at %2$s</string>
     <string name="follow_planned_tomorrow">tomorrow %1$s</string>
     <string name="follow_planned_body">→ %1$s · live from %2$s</string>
     <string name="follow_planned_due">Your bus leaves soon. Tap to follow it live.</string>
+    <string name="follow_planned_due_train">Your train leaves soon. Tap to follow it live.</string>
     <string name="follow_planned_card">Leaves at %1$s</string>
     <string name="follow_planned_card_live">Followed live from %1$s</string>
-    <string name="follow_lead_title">Following a later bus</string>
+    <string name="follow_lead_title">Following a later ride</string>
     <string name="follow_lead_label">Show the live notification this long before it leaves</string>
-    <string name="trip_stops_missing">The operator data leaves out some stops of this bus, so fewer stops are shown than it really has.</string>
+    <string name="trip_stops_missing">The operator data leaves out some stops of this ride, so fewer stops are shown than it really has.</string>
     <string name="journey_get_off">Get off at %1$s, %2$s</string>
     <string name="journey_next_leg">Then line %1$s: %2$s</string>
     <string name="planner_nearest_stop">Nearest stop</string>
@@ -725,6 +748,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="catch_car_miss">By car %1$d min, you\'ll probably miss it</string>
     <string name="catch_alert_car_leave_body">It\'s about %1$d min by car to %2$s.</string>
     <string name="catch_alert_car_miss_body">It\'s about %1$d min by car and the bus leaves sooner. Check the next departure.</string>
+    <string name="catch_alert_car_miss_body_train">It\'s about %1$d min by car and the train leaves sooner. Check the next departure.</string>
     <string name="catch_mode_walk">Going on foot: tap if by car</string>
     <string name="catch_mode_car">Going by car: tap if on foot</string>
     <string name="planner_to_stop_walk">To the stop on foot</string>
@@ -850,4 +874,5 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="place_pick_search">Search for a stop</string>
     <string name="place_pick_clear">Forget it</string>
     <string name="track_alert_arriving_body_timetable">By the timetable; the bus may be late. Get ready at %1$s.</string>
+    <string name="track_alert_arriving_body_timetable_train">By the timetable; the train may be late. Get ready at %1$s.</string>
 </resources>

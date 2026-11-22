@@ -265,28 +265,34 @@
     </plurals>
     <!-- Sledovanie spoja -->
     <string name="track_start">Sledovať tento spoj</string>
+    <string name="track_start_train">Sledovať tento vlak</string>
     <string name="track_stop">Zastaviť sledovanie</string>
     <string name="track_following">Sledujete tento spoj. Ťuknite na zastávku a pred výstupom vás upozorníme.</string>
+    <string name="track_following_train">Sledujete tento vlak. Ťuknite na zastávku a pred výstupom vás upozorníme.</string>
     <string name="track_your_stop">Tu vystupujete</string>
     <string name="track_set_stop">Tu vystúpim</string>
     <string name="track_permission_needed">Na sledovanie spoja povoľte upozornenia.</string>
     <string name="track_title">%1$s → %2$s</string>
     <string name="track_loading">Zisťuje sa poloha autobusu…</string>
+    <string name="track_loading_train">Zisťuje sa poloha vlaku…</string>
     <string name="track_waiting_text">Odchod o %1$s zo zastávky %2$s</string>
     <string name="track_next_title">Ďalšia: %1$s o %2$s</string>
     <string name="track_now_at">Teraz: %1$s</string>
     <string name="track_get_off_at">Vystupujete: %1$s</string>
     <string name="track_alert_arriving_title">Linka %1$s príde o %2$d min</string>
+    <string name="track_alert_arriving_title_train">Vlak %1$s príde o %2$d min</string>
     <string name="track_alert_arriving_body">Pripravte sa na zastávke %1$s.</string>
     <string name="track_alert_alight_title">Na ďalšej zastávke vystupujete</string>
     <string name="track_alert_alight_body">Ďalšia zastávka: %1$s</string>
     <string name="track_arrived_title">Ste v cieli</string>
     <string name="track_arrived_body">Autobus dorazil na zastávku %1$s. Sledovanie skončilo.</string>
+    <string name="track_arrived_body_train">Vlak dorazil: %1$s. Sledovanie skončilo.</string>
     <string name="track_channel_live">Sledovaný spoj</string>
     <string name="track_channel_alerts">Upozornenia na spoj</string>
     <string name="track_schedule_only">Časy podľa cestovného poriadku, bez živej polohy</string>
     <string name="planner_show_stops">Zobraziť všetky zastávky</string>
     <string name="community_bus_here">Autobus je tu</string>
+    <string name="community_bus_here_train">Vlak je tu</string>
     <string name="community_at">Na %1$s</string>
     <string name="community_still_at">Ešte na %1$s</string>
     <string name="community_thanks">Vďaka, zdieľané s ostatnými</string>
@@ -301,6 +307,7 @@
     <string name="catch_alert_leave_body">Na zastávku %2$s je to pešo asi %1$d min.</string>
     <string name="catch_alert_miss_title">Linku %1$s asi nestihnete</string>
     <string name="catch_alert_miss_body">Pešo je to asi %1$d min a autobus odchádza skôr. Pozrite ďalší spoj.</string>
+    <string name="catch_alert_miss_body_train">Pešo je to asi %1$d min a vlak odchádza skôr. Pozrite ďalší spoj.</string>
     <string name="privacy_title">Dve voliteľné funkcie</string>
     <string name="privacy_community_title">Pomoc s polohou autobusov</string>
     <string name="privacy_community_body">Mnohé autobusy neposielajú svoju polohu. Cestujúci ju môžu: tlačidlami v oznámení sledovaného spoja alebo automaticky z telefónu počas jazdy. Odosiela sa len spoj, zastávka a čas s náhodným ID, ktoré sa mení pri každom spoji. Nikdy nie vaša poloha.</string>
@@ -374,6 +381,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="arrival_alert_custom_label">Minúty (1–60)</string>
     <string name="catch_location_allow">Povoliť</string>
     <string name="community_bus_leaving">Autobus odchádza</string>
+    <string name="community_bus_leaving_train">Vlak odchádza</string>
     <string name="support_title">Podporiť Plan&amp;Ride</string>
     <string name="support_hint">Pomôžte, aby aplikácia zostala zadarmo a zlepšovala sa</string>
     <string name="support_body">Plan&amp;Ride je zadarmo a s otvoreným kódom, vzniká vo voľnom čase. Ak vám uľahčuje cestovanie, môžete ďalšiu prácu na projekte podporiť malým príspevkom. Je to úplne dobrovoľné a v aplikácii to nič nemení.</string>
@@ -403,9 +411,13 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="journey_start">Sledovať</string>
     <string name="journey_clear">Zrušiť</string>
     <string name="journey_then">Potom autobus %1$s → %2$s</string>
+    <string name="journey_then_train">Potom vlak %1$s → %2$s</string>
     <string name="journey_change_title">Prestúpte na autobus %1$s</string>
+    <string name="journey_change_title_train">Prestúpte na vlak %1$s</string>
     <string name="journey_change_body">Vystúpte na zastávke %1$s. Teraz sledujeme váš ďalší autobus.</string>
+    <string name="journey_change_body_train">Vystúpte na zastávke %1$s. Teraz sledujeme váš ďalší vlak.</string>
     <string name="journey_alight_change">Vystúpte na zastávke %1$s a prestúpte na autobus %2$s</string>
+    <string name="journey_alight_change_train">Vystúpte na zastávke %1$s a prestúpte na vlak %2$s</string>
     <string name="follow_live">Naživo</string>
     <string name="follow_timetable">Podľa poriadku</string>
     <string name="follow_until_departure">do odchodu zo zastávky %1$s</string>
@@ -416,15 +428,27 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
         <item quantity="many">Autobus je %1$d zastávok pred vami</item>
         <item quantity="other">Autobus je %1$d zastávok pred vami</item>
     </plurals>
+    <plurals name="follow_stops_away_train">
+        <item quantity="one">Vlak je %1$d zastávku pred vami</item>
+        <item quantity="few">Vlak je %1$d zastávky pred vami</item>
+        <item quantity="many">Vlak je %1$d zastávok pred vami</item>
+        <item quantity="other">Vlak je %1$d zastávok pred vami</item>
+    </plurals>
+    <plurals name="follow_stops_away_tram">
+        <item quantity="one">Električka je %1$d zastávku pred vami</item>
+        <item quantity="few">Električka je %1$d zastávky pred vami</item>
+        <item quantity="many">Električka je %1$d zastávok pred vami</item>
+        <item quantity="other">Električka je %1$d zastávok pred vami</item>
+    </plurals>
     <string name="pin_show">Zobraziť PIN</string>
     <string name="pin_hide">Skryť PIN</string>
     <string name="board_ends_here">Končí tu</string>
-    <string name="widget_description">Sledovaný autobus, vaše cesty s hviezdičkou a najbližšie spoje z obľúbených zastávok</string>
+    <string name="widget_description">Sledovaný spoj, vaše cesty s hviezdičkou a najbližšie spoje z obľúbených zastávok</string>
     <string name="widget_empty">Označte zastávku alebo spojenie v aplikácii hviezdičkou a zobrazí sa tu.</string>
     <string name="widget_follow">Sledovať</string>
     <string name="widget_updated">Aktualizované %1$s</string>
     <string name="change_time">Čas na prestup</string>
-    <string name="change_time_hint">Vyhľadávač ukáže prestup, len keď je medzi autobusmi aspoň toľko času. Kratší čas nájde viac spojení, dlhší je istejší, keď autobus mešká.</string>
+    <string name="change_time_hint">Vyhľadávač ukáže prestup, len keď je medzi spojmi aspoň toľko času. Kratší čas nájde viac spojení, dlhší je istejší, keď spoj mešká.</string>
     <string name="change_time_any">Akýkoľvek (aj 0 min)</string>
     <string name="change_time_minutes">Aspoň %1$d min</string>
     <string name="community_bus_gone">Už odišiel</string>
@@ -479,6 +503,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="home_following">Sledujete</string>
     <string name="home_also_following">Sledujete aj</string>
     <string name="track_following_later">Sledujete aj tento spoj. Upozornenie prevezme, keď sa skončí spoj pred ním alebo ho prestanete sledovať.</string>
+    <string name="track_following_later_train">Sledujete aj tento vlak. Upozornenie prevezme, keď sa skončí spoj pred ním alebo ho prestanete sledovať.</string>
     <string name="home_journey_underway">Prebieha</string>
     <string name="home_journey_in">o %1$s</string>
     <string name="day_today">Dnes</string>
@@ -536,11 +561,11 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="rides_repeat">Opakovať túto jazdu pravidelne</string>
     <string name="rides_channel">Pravidelné jazdy</string>
     <string name="rides_due_title">%1$s</string>
-    <string name="rides_due_body">Váš autobus o %1$s. Ťuknite a sledujte ho.</string>
+    <string name="rides_due_body">Váš spoj o %1$s. Ťuknite a sledujte ho.</string>
     <string name="rides_busy_title">%1$s sa nesleduje</string>
-    <string name="rides_busy_body">Už ste sledovali iný autobus.</string>
-    <string name="rides_finding">Hľadám váš autobus o %1$s…</string>
-    <string name="rides_missing_title">%1$s: autobus sa nenašiel</string>
+    <string name="rides_busy_body">Už ste sledovali iný spoj.</string>
+    <string name="rides_finding">Hľadám váš spoj o %1$s…</string>
+    <string name="rides_missing_title">%1$s: spoj sa nenašiel</string>
     <string name="rides_missing_body">Dnes nejde spoj o %1$s. Pozrite si vyhľadávač.</string>
     <string name="analytics_switch">Štatistiky používania</string>
     <string name="analytics_switch_hint">Anonymné používanie aplikácie cez Google Firebase Analytics, aby sme vedeli, čo zlepšiť. Bez údajov z účtu a polohy.</string>
@@ -607,6 +632,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="ticket_default_change">Zmeniť</string>
     <string name="transfer_risk_title">Linku %1$s asi nestihnete</string>
     <string name="transfer_risk_body">Tento autobus mešká asi %1$d min: na zastávke %2$s bude okolo %3$s, ale linka %4$s odchádza o %5$s. Ťuknite a uvidíte iné cesty odtiaľ.</string>
+    <string name="transfer_risk_body_train">Tento vlak mešká asi %1$d min: na zastávke %2$s bude okolo %3$s, ale linka %4$s odchádza o %5$s. Ťuknite a uvidíte iné cesty odtiaľ.</string>
     <string name="watch_report_channel">Hlásenia z hodiniek</string>
     <string name="watch_report_title">Záznamy z hodiniek sú v telefóne</string>
     <string name="watch_report_body">Ťuknite, opíšte problém a odošlite hlásenie so záznamami z hodiniek.</string>
@@ -724,6 +750,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_planned_tomorrow">zajtra %1$s</string>
     <string name="follow_planned_body">→ %1$s · naživo od %2$s</string>
     <string name="follow_planned_due">Váš spoj čoskoro odchádza. Ťuknite a sledujte ho naživo.</string>
+    <string name="follow_planned_due_train">Váš vlak čoskoro odchádza. Ťuknite a sledujte ho naživo.</string>
     <string name="follow_planned_card">Odchod o %1$s</string>
     <string name="follow_planned_card_live">Naživo od %1$s</string>
     <string name="follow_lead_title">Sledovanie neskoršieho spoja</string>
@@ -740,6 +767,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="catch_car_miss">Autom %1$d min, spoj asi nestihnete</string>
     <string name="catch_alert_car_leave_body">Autom je to na zastávku %2$s asi %1$d min.</string>
     <string name="catch_alert_car_miss_body">Autom je to asi %1$d min a spoj odchádza skôr. Pozrite si ďalší odchod.</string>
+    <string name="catch_alert_car_miss_body_train">Autom je to asi %1$d min a vlak odchádza skôr. Pozrite si ďalší odchod.</string>
     <string name="catch_mode_walk">Idete pešo: ťuknite, ak autom</string>
     <string name="catch_mode_car">Idete autom: ťuknite, ak pešo</string>
     <string name="planner_to_stop_walk">Na zastávku pešo</string>
@@ -862,4 +890,5 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="place_pick_search">Vyhľadajte zastávku</string>
     <string name="place_pick_clear">Zabudnúť</string>
     <string name="track_alert_arriving_body_timetable">Podľa cestovného poriadku, autobus môže meškať. Pripravte sa na zastávke %1$s.</string>
+    <string name="track_alert_arriving_body_timetable_train">Podľa cestovného poriadku, vlak môže meškať. Pripravte sa na zastávke %1$s.</string>
 </resources>

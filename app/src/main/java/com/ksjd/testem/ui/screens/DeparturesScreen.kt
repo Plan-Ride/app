@@ -732,6 +732,7 @@ private fun FollowControls(trip: TripSheetState) {
     // EM-0100: followed too, waiting its turn behind a bus that leaves sooner.
     val waiting = others.any { it.ref == trip.ref }
     val following = tracked?.ref == trip.ref || waiting
+    val rail = com.ksjd.testem.ui.components.lineKind(trip.detail?.line?.takeIf { it.isNotBlank() } ?: trip.ref.line, vehicle = trip.detail?.vehicle.orEmpty()) == "rail"
     var denied by remember { mutableStateOf(false) }
     val haptic = rememberHaptic()
     val start = {
@@ -744,7 +745,8 @@ private fun FollowControls(trip: TripSheetState) {
     }
     if (following) {
         Text(
-            stringResource(if (waiting) R.string.track_following_later else R.string.track_following),
+            stringResource(when { waiting && rail -> R.string.track_following_later_train; waiting -> R.string.track_following_later
+                rail -> R.string.track_following_train; else -> R.string.track_following }),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -771,7 +773,7 @@ private fun FollowControls(trip: TripSheetState) {
         ) {
             Icon(Icons.Outlined.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.track_start))
+            Text(stringResource(if (rail) R.string.track_start_train else R.string.track_start))
         }
         if (denied) {
             Spacer(Modifier.height(8.dp))
