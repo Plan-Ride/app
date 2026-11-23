@@ -279,6 +279,12 @@ object TripTracking {
     }
     fun clearDraft() { _draft.value = emptyList() }
 
+    /** The open day phone's made-up followed bus (Demo.simulateFollow): only the card and widget show it, nothing runs. */
+    fun demoShow(trip: TrackedTrip?, view: FollowView?) {
+        _active.value = trip
+        _view.value = view
+    }
+
     /** Follows [legs] as one journey: each bus until its stop, then the next one. */
     fun startJourney(context: Context, legs: List<TrackedTrip>) {
         val first = legs.firstOrNull() ?: return

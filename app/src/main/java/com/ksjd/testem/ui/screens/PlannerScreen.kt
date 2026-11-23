@@ -157,6 +157,15 @@ fun PlannerScreen(
         }
     }
 
+    // The open day tour shows the results (with their prices) and goes back up (Demo.kt).
+    val demoScroll by com.ksjd.testem.Demo.plannerScroll.collectAsState()
+    LaunchedEffect(demoScroll) {
+        // Not cleared here: clearing it would restart this effect and stop the scroll (the tour alternates the two).
+        val target = demoScroll ?: return@LaunchedEffect
+        val results = 3 + (if (state.savedRoutes.isNotEmpty() || state.recentRoutes.isNotEmpty()) 1 else 0) +
+            (if (state.errorMessage.isNotBlank()) 1 else 0) + 1
+        listState.animateScrollToItem(if (target == "results" && state.connections.isNotEmpty()) results else 0)
+    }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
         item {
             ScreenHeader(
@@ -240,7 +249,8 @@ private fun PlacesRow(state: TimetableState, viewModel: AppViewModel) {
     val context = LocalContext.current
     val haptic = rememberHaptic()
     val prefs = remember { com.ksjd.testem.CredentialsManager(context) }
-    var places by remember { mutableStateOf(listOf("home", "work").associateWith { prefs.getPlace(it) }) }
+    val placesChanged by com.ksjd.testem.Demo.places.collectAsState()
+    var places by remember(placesChanged) { mutableStateOf(listOf("home", "work").associateWith { prefs.getPlace(it) }) }
     var pending by remember { mutableStateOf<com.ksjd.testem.CpStopSuggestion?>(null) }
     val placesScope = androidx.compose.runtime.rememberCoroutineScope()
     val go: (com.ksjd.testem.CpStopSuggestion) -> Unit = { place ->

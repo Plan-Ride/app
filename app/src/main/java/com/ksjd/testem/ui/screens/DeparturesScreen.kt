@@ -500,13 +500,16 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
     val trip = if (live != null) sheet.copy(detail = live.detail) else sheet
     var showMap by remember { mutableStateOf(false) }
     val alight = if (following) tracked?.alightOrder else trip.alightOrder
+    val demoMap by com.ksjd.testem.Demo.tripMap.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(demoMap) { if (com.ksjd.testem.Demo.on) showMap = demoMap }
     if (showMap && trip.detail != null) BusMapDialog(trip.ref, trip.detail, alight) { showMap = false }
     var sharing by remember { mutableStateOf(false) }
     if (sharing) {
         val shared = if (following) tracked!! else com.ksjd.testem.live.TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder)
         ShareTripDialog(shared, trip.detail?.destination.orEmpty()) { sharing = false }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface,
+        scrimColor = if (com.ksjd.testem.Demo.on) Color.Transparent else androidx.compose.material3.BottomSheetDefaults.ScrimColor) {
         Column(Modifier.padding(horizontal = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 2.18.0: a train shows its kind and number ("R 845") in the train colour, with the pictogram.

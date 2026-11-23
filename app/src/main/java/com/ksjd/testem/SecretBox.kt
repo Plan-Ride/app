@@ -31,9 +31,20 @@ object SecretBox {
         return generator.generateKey()
     }
 
-    /** "iv:ciphertext", both Base64. */
+    /**
+     * "iv:ciphertext", both Base64. In the demo build, a key the Keystore won't use (a custom Android 10 ROM: -62, the
+     * key needs upgrading and the phone doesn't) is replaced by a new one.
+     */
     fun encrypt(plain: String): String {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, key())
+        } catch (e: java.security.GeneralSecurityException) {
+            // Only the open day demo: a friend's custom ROM refused the key; the Play app keeps its old behaviour.
+            if (!Demo.on) throw e
+            KeyStore.getInstance(STORE).apply { load(null) }.deleteEntry(ALIAS)
+            cipher.init(Cipher.ENCRYPT_MODE, key())
+        }
         val sealed = cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
         return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(sealed, Base64.NO_WRAP)
     }

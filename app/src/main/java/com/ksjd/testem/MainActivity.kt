@@ -72,6 +72,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySettings()
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        // The open day phone: the screen never turns off while the app is open, touched or not.
+        if (Demo.on) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        handleIntent(intent)
+        setContent {
+            // The open day phone builds everything again after its reset (Demo.reset); elsewhere it never changes.
+            val generation by Demo.generation.collectAsState()
+            androidx.compose.runtime.key(generation) { Content() }
+        }
+    }
+
+    /** What the app takes from its settings at start (language, haptics, planner options, alarms). */
+    private fun applySettings() {
         // Apply the saved language before any UI is inflated.
         val languageCode = CredentialsManager(this).getLanguageCode()
         if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -90,10 +105,11 @@ class MainActivity : AppCompatActivity() {
         com.ksjd.testem.rides.RideScheduler.reschedule(applicationContext)
         com.ksjd.testem.reminders.LastBus.reschedule(applicationContext)
         com.ksjd.testem.offline.OfflineTimetables.schedule(applicationContext)
-        enableEdgeToEdge()
-        super.onCreate(savedInstanceState)
-        handleIntent(intent)
-        setContent {
+    }
+
+    @Composable
+    private fun Content() {
+        run {
             val viewModel: AppViewModel = viewModel()
             val liveViewModel: LiveViewModel = viewModel()
             val appState by viewModel.appState.collectAsState()
@@ -115,7 +131,9 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             TestEMTheme(darkTheme = dark, themePreset = preset, amoledMode = appState.amoledEnabled, background = appState.backgroundColor) {
-                AppRoot(viewModel, liveViewModel, this)
+                if (Demo.on) com.ksjd.testem.ui.screens.DemoFrame(viewModel, liveViewModel, onReset = { Demo.reset(this, ::applySettings) }) {
+                    AppRoot(viewModel, liveViewModel, this)
+                } else AppRoot(viewModel, liveViewModel, this)
             }
         }
     }
@@ -242,6 +260,8 @@ private fun MainScaffold(
     if (unlocking) UnlockDialog(viewModel, appState, activity, onDismiss = { unlocking = false })
 
     BackHandler(enabled = selected != startTab) { selected = startTab }
+    val demoTab by Demo.tab.collectAsState()
+    LaunchedEffect(demoTab) { demoTab?.let { if (it in tabs) selected = it; Demo.tab.value = null } }
     val reportRequested by com.ksjd.testem.hub.AppLogs.reportRequested.collectAsState()
     LaunchedEffect(reportRequested) { if (reportRequested) selected = AppTab.Account }
     val topUpRequested by com.ksjd.testem.reminders.Reminders.topUpRequested.collectAsState()

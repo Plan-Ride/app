@@ -344,7 +344,11 @@ object HubClient {
     }
 
     private fun post(path: String, body: JsonObject): JsonObject =
-        execute(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/$path").post(body.toString().toRequestBody(JSON)))
+        // The open day phone writes nothing to emHUB (reports, riders' delays, shares): a made-up answer that every caller reads.
+        if (com.ksjd.testem.Demo.on) JsonObject().apply {
+            addProperty("code", "EM-DEMO"); addProperty("id", "demo"); addProperty("token", "demo"); addProperty("claimId", "demo")
+            addProperty("label", ""); addProperty("url", BuildConfig.HUB_URL); addProperty("expiresAt", System.currentTimeMillis() / 1000 + 600)
+        } else execute(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/$path").post(body.toString().toRequestBody(JSON)))
 
     private fun execute(builder: Request.Builder): JsonObject {
         val request = builder.header("X-App-Key", BuildConfig.HUB_APP_KEY).header("X-App-Version", "android ${BuildConfig.VERSION_NAME}").build()

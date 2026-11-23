@@ -141,6 +141,7 @@ fun TopUpSheet(viewModel: AppViewModel, card: AccountDetails, onDismiss: () -> U
             if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
             Button(
                 onClick = {
+                    if (com.ksjd.testem.Demo.on) { viewModel.demoTopUp(cents!!); outcome = Outcome.Paid; return@Button }
                     busy = true
                     error = ""
                     scope.launch {

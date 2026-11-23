@@ -131,7 +131,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val hasIds = prefs.hasIdsAccount()
         // The PIN guards the accounts only: without one there is nothing to lock.
         if (!hasAccount && !hasIds && prefs.isPinSet()) prefs.clearPin()
-        val pinSet = prefs.isPinSet()
+        // The open day account needs no PIN: it counts as set and open.
+        val pinSet = prefs.isPinSet() || isDemo()
         _appState.value = AppState(
             hasAccount = hasAccount,
             onboarded = prefs.isOnboarded(),
@@ -143,7 +144,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             themeMode = prefs.getThemeMode(),
             backgroundColor = prefs.getBackgroundColor(),
             isPinSet = pinSet,
-            isAppUnlocked = !pinSet,
+            isAppUnlocked = !pinSet || isDemo(),
             biometricEnabled = prefs.getBiometricEnabled(),
             lockTimeoutSeconds = prefs.getLockTimeoutSeconds(),
             lowCreditWarningThreshold = prefs.getLowCreditWarningThreshold(),
@@ -157,7 +158,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             ticketDefault = prefs.getTicketDefault(),
             historyWallet = prefs.getHistoryWallet()
         )
-        if (hasIds) _idsState.value = IdsState(account = prefs.getLastIdsAccount(), qr = idsQrBitmap(prefs.getIdsQr()))
+        if (hasIds && isDemo(prefs.getIdsEmail())) demoIds()
+        else if (hasIds) _idsState.value = IdsState(account = prefs.getLastIdsAccount(), qr = idsQrBitmap(prefs.getIdsQr()))
         prefs.getLastAccount()?.let { cached ->
             _ticketState.update {
                 it.copy(userName = cached.userName, cards = cached.cards, selectedSnr = prefs.getSelectedCardSnr())
@@ -171,6 +173,57 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 rides = prefs.getRecurringRides()
             )
         }
+    }
+
+    // ============================================================ open day demo (Demo.kt)
+
+    private fun isDemo(email: String = prefs.getEmail()) = Demo.on && email == Demo.EMAIL
+    private var demoCredit = 1240
+    private val demoTopUps = mutableListOf<Pair<Long, Int>>()
+
+    /** Whatever a visitor types on the sign-in form, it is the demo account again. */
+    private fun demoSignIn() {
+        prefs.saveCredentials(Demo.EMAIL, "demo")
+        _appState.update {
+            it.copy(isLoggedIn = true, isLoading = false, loginError = "", hasAccount = true, email = Demo.EMAIL, password = "demo",
+                isPinSet = true, isAppUnlocked = true)
+        }
+        applyAccount(Demo.account(demoCredit))
+        startPolling()
+    }
+
+    /** A made-up ticket code that changes every 10 s, as the real one does. */
+    private fun demoPolling() = viewModelScope.launch {
+        var n = 0
+        while (true) {
+            val text = "PLAN&RIDE UKAZKA ${n++} ${System.currentTimeMillis() / 10_000}"
+            val bitmap = withContext(Dispatchers.Default) {
+                QRCodeGenerator.generateQRCode(text, QRDaemonConfig.QR_BITMAP_SIZE, QRDaemonConfig.QR_BITMAP_SIZE)
+            }
+            val now = System.currentTimeMillis()
+            _ticketState.update {
+                it.copy(phase = TicketPhase.Active, qrBitmap = bitmap, tokenBase64 = text, tokenHex = "", lastUpdateTime = now, lastConfirmedTime = now)
+            }
+            delay(10_000)
+        }
+    }
+
+    private fun demoIdsSignIn() {
+        prefs.saveIdsCredentials(Demo.EMAIL, "demo")
+        _appState.update { it.copy(isLoading = false, loginError = "", hasIdsAccount = true, idsEmail = Demo.EMAIL, isPinSet = true, isAppUnlocked = true) }
+        demoIds()
+    }
+
+    private fun demoIds() {
+        _idsState.value = IdsState(account = Demo.idsAccount(), qr = idsQrBitmap("text:PLAN&RIDE UKAZKA IDS BBSK"))
+    }
+
+    /** Credit added in the demo at once, no payment. */
+    fun demoTopUp(cents: Int) {
+        demoCredit += cents
+        demoTopUps += System.currentTimeMillis() to cents
+        applyAccount(Demo.account(demoCredit))
+        loadCardHistory()
     }
 
     // ============================================================ onboarding
@@ -192,6 +245,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun login(email: String, password: String, wallet: Wallet = Wallet.SADZV) {
+        if (Demo.on) return if (wallet == Wallet.IDS) demoIdsSignIn() else demoSignIn()
         val emailTrimmed = email.trim()
         if (emailTrimmed.isEmpty() || password.isEmpty()) {
             _appState.update { it.copy(loginError = app.getString(R.string.login_error_fill_fields)) }
@@ -291,6 +345,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** New credit, tickets and identifiers from the e-shop (the QR code is fetched once: it never changes). */
     fun refreshIds() {
+        if (isDemo(_appState.value.idsEmail)) return demoIds()
         val state = _appState.value
         if (!state.hasIdsAccount || _idsState.value.isLoading) return
         var current = idsSession ?: IdsSession(app, prefs.getIdsEmail(), prefs.getIdsPassword()).also { idsSession = it }
@@ -364,8 +419,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ============================================================== polling
 
     fun startPolling() {
-        val current = session ?: return
         if (pollingJob?.isActive == true || !_appState.value.isAppUnlocked) return
+        if (session == null && _appState.value.isLoggedIn && isDemo(_appState.value.email)) { pollingJob = demoPolling(); return }
+        val current = session ?: return
         pollingJob = viewModelScope.launch {
             current.pollTokens(object : TicketSession.Listener {
                 override fun onPhase(phase: TicketPhase) {
@@ -421,6 +477,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshAccount() {
+        if (isDemo(_appState.value.email)) return applyAccount(Demo.account(demoCredit))
         val current = session ?: return
         if (_ticketState.value.isRefreshingAccount) return
         viewModelScope.launch {
@@ -460,7 +517,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return session ?: throw java.io.IOException("Signed out")
     }
 
-    suspend fun topUpLimits(): TicketSession.TopUpLimits = signedInSession().topUpLimits()
+    suspend fun topUpLimits(): TicketSession.TopUpLimits =
+        if (isDemo(_appState.value.email)) TicketSession.TopUpLimits(0, 200, 5000, 1000) else signedInSession().topUpLimits()
 
     /** Creates the top-up order for the selected card; the rider pays it on the returned page. */
     suspend fun startTopUp(limits: TicketSession.TopUpLimits, cents: Int): TicketSession.PaymentGate {
@@ -477,6 +535,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadCardHistory(limit: Int = 100) {
+        if (isDemo(_appState.value.email)) {
+            _ticketState.update { it.copy(historyState = CardHistoryState(items = Demo.history(demoCredit, demoTopUps), lastUpdatedMs = System.currentTimeMillis())) }
+            return
+        }
         val current = session ?: return
         if (_ticketState.value.historyState.isLoading) return
         viewModelScope.launch {
@@ -511,7 +573,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Hides the ticket and account again (the rest of the app stays usable). */
     fun lock() {
-        if (!_appState.value.isPinSet) return
+        if (!_appState.value.isPinSet || isDemo(_appState.value.email)) return
         _appState.update { it.copy(isAppUnlocked = false) }
         if (pollingJob?.isActive == true) stopPolling(TicketPhase.Paused)
     }

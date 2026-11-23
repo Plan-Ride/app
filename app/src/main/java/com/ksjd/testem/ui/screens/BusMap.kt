@@ -99,6 +99,7 @@ fun BusMapDialog(ref: TripRef, detail: TripDetail, alightOrder: Int?, onDismiss:
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            DemoStripOver()
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
                 Text(stringResource(R.string.busmap_title, ref.line, detail.destination.ifBlank { ref.destination }),

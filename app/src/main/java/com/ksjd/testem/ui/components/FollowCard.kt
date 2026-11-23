@@ -271,7 +271,7 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                 }
                 if (view != null && p != null) CrowdRow(view, on)
                 if (trip.nextLegs.isNotEmpty()) JourneyLegs(trip, on)
-                BatteryPrompt(on)
+                if (!com.ksjd.testem.Demo.on) BatteryPrompt(on)
             }
         }
     }

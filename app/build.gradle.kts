@@ -41,6 +41,7 @@ android {
         }
         buildConfigField("String", "HUB_URL", "\"${local.getProperty("hub.url", "https://par.karafa.net")}\"")
         buildConfigField("String", "HUB_APP_KEY", "\"${local.getProperty("hub.appKey", "")}\"")
+        buildConfigField("boolean", "DEMO", "false")
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -77,6 +78,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        // The school open day phone: a demo account, a tour that runs by itself, nothing sent to emHUB (see Demo.kt).
+        create("demo") {
+            initWith(getByName("release"))
+            versionNameSuffix = "-demo"
+            buildConfigField("boolean", "DEMO", "true")
+            matchingFallbacks += "release"
         }
     }
     compileOptions {
