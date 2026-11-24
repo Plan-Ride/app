@@ -61,6 +61,17 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 2.18.5: a shared ride's link opens here, not in the browser (App Links; the hosts publish
+                 /.well-known/assetlinks.json). par.karafa.net/f: links sent before 2.18.5. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="app.par.karafa.net" />
+                <data android:host="par.karafa.net" />
+                <data android:path="/f" />
+            </intent-filter>
             <!-- 2.17.0: "Take me home" / "To work" on the launcher icon, and for Google Assistant. -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>

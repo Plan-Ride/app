@@ -152,7 +152,14 @@ private const val EXTRA_FEATURE = "feature"
 private val featureRequested = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
 /** Tapping the follow notification: show that bus over the home tab. */
+/** 2.18.5: a shared ride opened from its link (App Links): the Departures tab shows its bus's stops. */
+private val sharedTrip = kotlinx.coroutines.flow.MutableStateFlow<com.ksjd.testem.live.TrackedTrip?>(null)
+
 private fun handleIntent(intent: android.content.Intent?) {
+    intent?.data?.takeIf { intent.action == android.content.Intent.ACTION_VIEW }?.let { uri ->
+        intent.data = null // not again after rotation
+        sharedTrip.value = com.ksjd.testem.live.ShareTrip.fromLink(uri)
+    }
     if (intent?.getBooleanExtra(com.ksjd.testem.live.TripTracking.EXTRA_SHOW_FOLLOWED, false) == true) {
         intent.removeExtra(com.ksjd.testem.live.TripTracking.EXTRA_SHOW_FOLLOWED) // not again after rotation
         com.ksjd.testem.live.TripTracking.requestShow()
@@ -290,6 +297,15 @@ private fun MainScaffold(
         val at = java.time.Instant.ofEpochMilli(r.atMs.takeIf { it > 0 } ?: System.currentTimeMillis()).atZone(SK_ZONE)
         selected = AppTab.Planner
         viewModel.searchAt(SavedRoute(PLANNER_ALL, r.from, r.to), "%02d:%02d".format(at.hour, at.minute), at.toLocalDate().toString())
+    }
+
+    // A shared ride's link: its bus's stops on the Departures tab; following it is the opener's choice (as on the web).
+    val shared by sharedTrip.collectAsState()
+    LaunchedEffect(shared) {
+        val trip = shared ?: return@LaunchedEffect
+        sharedTrip.value = null
+        selected = AppTab.Departures
+        liveViewModel.openFollowed(trip)
     }
 
     // Follow notification tapped: home tab (the ticket is one swipe away) with the bus's stops on top.

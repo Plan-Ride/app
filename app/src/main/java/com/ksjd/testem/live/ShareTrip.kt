@@ -7,12 +7,14 @@ import com.google.gson.Gson
 import com.ksjd.testem.R
 
 /**
- * A bus as a link anyone can open in the web version (through emhub's /f, which knows where the web version is).
+ * A bus as a link anyone can open: in Plan&Ride where it's installed on Android (App Links, 2.18.5), else in the web
+ * version at app.par.karafa.net. Links sent before 2.18.5 (par.karafa.net/f, emHUB forwards them) open the app too.
  * The link holds only the bus (line, trip, day) and the stops where it's ridden from and to: no account, no id of
  * the person sharing, no location. Opening it shows the bus; following it there is the opener's own choice.
  */
 object ShareTrip {
-    private const val BASE = "https://par.karafa.net/f?t="
+    private const val BASE = "https://app.par.karafa.net/f?t="
+    private val HOSTS = setOf("app.par.karafa.net", "par.karafa.net")
 
     private data class Payload(val ref: TripRef, val board: List<Int>?, val alight: Int?)
 
@@ -23,6 +25,10 @@ object ShareTrip {
     }
 
     fun link(trip: TrackedTrip): String = BASE + payload(trip)
+
+    /** The bus in a shared link opened in the app (https://app.par.karafa.net/f?t=…), null if it isn't one or can't be read. */
+    fun fromLink(uri: android.net.Uri): TrackedTrip? =
+        if (uri.scheme == "https" && uri.host in HOSTS && uri.path == "/f") uri.getQueryParameter("t")?.let(::decode) else null
 
     /** A shared bus back from its payload (a share code that was accepted), null if it can't be read. */
     fun decode(payload: String): TrackedTrip? = runCatching {
