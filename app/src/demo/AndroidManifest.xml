@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The open day build only (Demo.kt): the device owner (kiosk, updates from emHUB) and its way out. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- emHUB's "Update the app" and "Remove the app" -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- The touch lock: the screen turned off with the power button comes straight back on -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+
+    <application>
+        <receiver
+            android:name=".DemoAdmin"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/demo_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+        <!-- Only adb's shell holds DUMP: no app on the phone can send this. -->
+        <receiver
+            android:name=".DemoAdmin$Release"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="com.ksjd.testem.DEMO_UNLOCK" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".DemoAdmin$Back" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".DemoAdmin$Installed" android:exported="false" />
+    </application>
+</manifest>

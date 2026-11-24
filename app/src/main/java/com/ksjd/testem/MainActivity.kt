@@ -77,6 +77,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // The open day phone: the screen never turns off while the app is open, touched or not.
         if (Demo.on) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // ...and woken by the power button, it comes back straight to the demo, over the lock screen (Demo.wakeUp).
+        if (Demo.on && android.os.Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
         handleIntent(intent)
         setContent {
             // The open day phone builds everything again after its reset (Demo.reset); elsewhere it never changes.
@@ -260,6 +262,9 @@ private fun MainScaffold(
     if (unlocking) UnlockDialog(viewModel, appState, activity, onDismiss = { unlocking = false })
 
     BackHandler(enabled = selected != startTab) { selected = startTab }
+    // The open day phones tell emHUB which tab a visitor is on.
+    val tabContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(selected) { if (Demo.on) { Demo.screen = tabContext.getString(selected.labelRes); Demo.sendState() } }
     val demoTab by Demo.tab.collectAsState()
     LaunchedEffect(demoTab) { demoTab?.let { if (it in tabs) selected = it; Demo.tab.value = null } }
     val reportRequested by com.ksjd.testem.hub.AppLogs.reportRequested.collectAsState()

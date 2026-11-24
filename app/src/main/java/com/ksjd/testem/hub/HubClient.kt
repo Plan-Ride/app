@@ -343,6 +343,22 @@ object HubClient {
         runCatching { post("eta/${link.id}/end", JsonObject().apply { addProperty("token", link.token) }) }
     }
 
+    /** The demo build uploaded in emHUB's dashboard, for an open day phone to update itself (Demo.update). */
+    fun demoApk(target: java.io.File) {
+        client.newCall(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/demo/apk").header("X-App-Key", BuildConfig.HUB_APP_KEY)
+            .header("X-App-Version", "android ${BuildConfig.VERSION_NAME}").get().build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            target.outputStream().use { out -> response.body!!.byteStream().copyTo(out) }
+        }
+    }
+
+    /** The open day demo phones' live line to emHUB (Demo.connect): the one thing they really send, past the demo's block. */
+    fun demoSocket(device: String, listener: okhttp3.WebSocketListener): okhttp3.WebSocket {
+        val base = BuildConfig.HUB_URL.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
+        return wsClient.newWebSocket(Request.Builder().url("$base/api/v1/demo/live?id=$device")
+            .header("X-App-Key", BuildConfig.HUB_APP_KEY).header("X-App-Version", "android ${BuildConfig.VERSION_NAME}").build(), listener)
+    }
+
     private fun post(path: String, body: JsonObject): JsonObject =
         // The open day phone writes nothing to emHUB (reports, riders' delays, shares): a made-up answer that every caller reads.
         if (com.ksjd.testem.Demo.on) JsonObject().apply {
