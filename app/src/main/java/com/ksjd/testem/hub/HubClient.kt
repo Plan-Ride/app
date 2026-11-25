@@ -192,11 +192,17 @@ object HubClient {
         return execute(Request.Builder().url(url).get())
     }
 
-    /** 2.19.0: emHUB's signed packet of the live buses around [lat], [lon], to broadcast to phones without data. */
-    suspend fun p2pPack(lat: Double, lon: Double): ByteArray = withContext(Dispatchers.IO) {
+    /**
+     * 2.19.0: emHUB's signed packets for [lat], [lon], to broadcast to phones without data: the live buses around, and
+     * the nearest stop's departures with its notices (null when no stop is near).
+     */
+    suspend fun p2pPack(lat: Double, lon: Double): Pair<ByteArray, ByteArray?> = withContext(Dispatchers.IO) {
         val url = "${BuildConfig.HUB_URL}/api/v1/p2p/pack".toHttpUrl().newBuilder()
             .addQueryParameter("lat", "%.3f".format(java.util.Locale.ROOT, lat)).addQueryParameter("lon", "%.3f".format(java.util.Locale.ROOT, lon)).build()
-        okio.ByteString.Companion.run { execute(Request.Builder().url(url).get()).get("wire").asString.decodeBase64() }!!.toByteArray()
+        val answer = execute(Request.Builder().url(url).get())
+        fun bytes(key: String) = answer.get(key)?.takeUnless { it.isJsonNull }?.asString
+            ?.let { okio.ByteString.Companion.run { it.decodeBase64() }?.toByteArray() }
+        bytes("wire")!! to bytes("board")
     }
 
     /** 2.18.0: opens the connection to emHUB ahead of the first search; on mobile data that is most of the wait. */

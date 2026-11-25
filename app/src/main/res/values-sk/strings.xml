@@ -584,7 +584,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_battery_needed">Sledovanie sa môže zastaviť, keď telefón Plan&amp;Ride na pozadí uspí. V nastaveniach aplikácie nastavte Batériu na Neobmedzené.</string>
     <string name="follow_battery_open">Otvoriť nastavenia</string>
     <string name="follow_battery_later">Teraz nie</string>
-    <string name="whats_new_body">• Bez dát? Plan&amp;Ride sleduje autobus ďalej podľa posledných údajov a vašej polohy a na karte to aj povie.\n• Pomáhať telefónom bez dát v okolí (Nastavenia): cez Bluetooth váš telefón posunie meškania, ktoré pozná, a vypočuje si ich, keď dáta nemáte vy. Platia len meškania podpísané Plan&amp;Ride, nič o vás sa neposiela.\n• Aj meškanie autobusu na prestup sa dozviete od telefónu v okolí, takže viete, či ho stihnete.</string>
+    <string name="whats_new_body">• Bez dát? Plan&amp;Ride sleduje autobus ďalej podľa posledných údajov a vašej polohy a na karte to aj povie.\n• Pomáhať telefónom bez dát v okolí (Nastavenia): cez Bluetooth váš telefón posunie meškania autobusov, ich obsadenosť a odchody z najbližšej zastávky aj s oznamami. Telefón bez dát ich posúva ďalej, takže jeden telefón s dátami stačí pre celý autobus.\n• Platí len to, čo podpísal Plan&amp;Ride, a nič o vás ani o tom, kam idete, sa neposiela.\n• Aj meškanie autobusu na prestup sa dozviete od telefónu v okolí, takže viete, či ho stihnete.</string>
     <string name="topup_button">Dobiť kredit</string>
     <string name="topup_title">Dobitie kreditu na kartu</string>
     <string name="topup_card">Karta %1$s · teraz %2$s</string>
@@ -892,6 +892,8 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="p2p_offline">Bez pripojenia: údaje spred %1$d min a vaša poloha</string>
     <string name="p2p_heard">Meškanie od telefónu v okolí, overené Plan&amp;Ride</string>
     <string name="p2p_nearby_short">od telefónu v okolí</string>
+    <string name="p2p_board_title">Odchody: %1$s</string>
+    <string name="p2p_board_from">Bez dát: od telefónu v okolí pred %1$d min, overené Plan&amp;Ride</string>
     <string name="walk_other_switch">Pešo na inú zastávku</string>
     <string name="walk_other_switch_hint">Spojenie môže začať alebo skončiť krátkou chôdzou na blízku zastávku. Vypnuté: začne a skončí presne na zastávkach, ktoré ste vybrali; pri prestupe môžete stále prejsť pešo na inú zastávku.</string>
     <string name="place_pick_title">Nastaviť: %1$s</string>

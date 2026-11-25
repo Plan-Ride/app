@@ -46,6 +46,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ksjd.testem.live.LiveViewModel
@@ -310,6 +311,26 @@ private fun MainScaffold(
 
     // Follow notification tapped: home tab (the ticket is one swipe away) with the bus's stops on top.
     val showFollowed by com.ksjd.testem.live.TripTracking.showRequested.collectAsState()
+    // 2.19.0: phones without data nearby: while the app is open (and not only while following a bus), offer the packets for
+    // where the phone is, or listen for them without data. Off with the setting; following keeps them going in the background.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            try {
+                while (true) {
+                    val here = if (com.ksjd.testem.CredentialsManager(appContext).getP2pNearby() && com.ksjd.testem.live.Locations.hasPermission(appContext))
+                        com.ksjd.testem.live.Locations.current(appContext, maxAgeMs = 5 * 60_000L, fallbackToLastKnown = true)?.let { it.latitude to it.longitude }
+                    else null
+                    com.ksjd.testem.p2p.P2p.tick(appContext, here)
+                    kotlinx.coroutines.delay(20_000L)
+                }
+            } finally {
+                if (com.ksjd.testem.live.TripTracking.active.value == null) com.ksjd.testem.p2p.P2p.stop(appContext)
+            }
+        }
+    }
+
     LaunchedEffect(showFollowed) {
         if (!showFollowed) return@LaunchedEffect
         com.ksjd.testem.live.TripTracking.showHandled()

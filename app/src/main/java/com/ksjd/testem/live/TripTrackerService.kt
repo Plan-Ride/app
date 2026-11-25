@@ -630,7 +630,13 @@ class TripTrackerService : Service() {
         if (com.ksjd.testem.p2p.P2p.online(this)) return null
         val heard = com.ksjd.testem.p2p.P2pStore.about(current.ref)?.takeIf { it.atMs > fetchedAt }
         val base = known.copy(offlineSinceMs = fetchedAt, positionSource = if (known.positionSource.isLive) PositionSource.BusDelay else known.positionSource)
-        return heard?.let { base.withDelay(it.delaySeconds).copy(positionSource = PositionSource.Nearby) } ?: base
+        return heard?.let {
+            base.withDelay(it.delaySeconds).copy(
+                positionSource = PositionSource.Nearby,
+                // How full it is, when riders said so (the packet has it from emHUB).
+                crowd = if (it.crowd in 1..3) com.ksjd.testem.hub.Crowd(it.crowd, ((System.currentTimeMillis() - it.atMs) / 60_000L).toInt()) else base.crowd
+            )
+        } ?: base
     }
 
     private fun withLocalDelay(detail: TripDetail): TripDetail {

@@ -201,6 +201,8 @@ fun TicketScreen(
             }
             AlsoFollowing(now)
             if (com.ksjd.testem.hub.HubClient.isConfigured && !com.ksjd.testem.Demo.on) com.ksjd.testem.ui.components.ServiceNotices()
+            // 2.19.0: a stop's board heard from a phone nearby while this one has no data.
+            com.ksjd.testem.ui.components.NearbyBoard(now)
             if (unlocked && ticket.phase == TicketPhase.SignedOut) {
                 Notice(
                     stringResource(R.string.ticket_signed_out),

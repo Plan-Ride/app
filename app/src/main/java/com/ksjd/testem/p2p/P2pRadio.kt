@@ -35,30 +35,36 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
 import java.util.UUID
+import kotlinx.coroutines.sync.withLock
 
 /**
- * 2.19.0: the radios for [P2pPack]. A phone with data "shouts": it offers emHUB's signed packet over Bluetooth LE (a
- * readable value any phone may read) and Google Nearby (sent to whoever connects). A phone without data only listens:
- * it reads what phones around it offer, sends nothing of its own, and keeps a packet only when emHUB's signature fits.
- * Both radios run, so phones without Google services (Huawei) still take part over plain Bluetooth LE.
+ * 2.19.0: the radios for [P2pPack]. A phone offers the signed packets it has (fetched with data, or heard and passed on
+ * without) over Bluetooth LE (two readable values any phone may read) and Google Nearby (sent to whoever connects). A
+ * phone without data also listens: it reads what phones around it offer and keeps a packet only when emHUB's signature
+ * fits. A listener sends nothing of its own. Both radios run, so phones without Google services (Huawei) take part over
+ * plain Bluetooth LE.
  *
  * ponytail: one listener connection at a time and each phone read at most once a minute; enough for a stop or a bus.
  */
-@SuppressLint("MissingPermission") // [allowed] is checked before anything starts
+@SuppressLint("MissingPermission") // the permissions are checked before anything starts
 object P2pRadio {
     private const val TAG = "P2p"
     val SERVICE: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0190")
-    private val PACKET: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0191")
+    private val BUSES: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0191")
+    private val BOARD: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0192")
     private const val NEARBY_ID = "com.ksjd.testem.p2p"
     private const val READ_AGAIN_MS = 60_000L
 
-    /** What this phone offers now (null: nothing, or not sharing). */
-    @Volatile var wire: ByteArray? = null
+    /** What this phone offers now (null: nothing). */
+    @Volatile var buses: ByteArray? = null
+        private set
+    @Volatile var board: ByteArray? = null
+        private set
 
     private var gattServer: BluetoothGattServer? = null
     private var advertising: AdvertiseCallback? = null
     private var scanning: ScanCallback? = null
-    private var nearbySharing = false
+    private var nearbyOffering = false
     private var nearbyListening = false
     private val lastRead = mutableMapOf<String, Long>()
     @Volatile private var reading = false
@@ -88,33 +94,36 @@ object P2pRadio {
 
     private fun adapter(context: Context) = context.getSystemService(BluetoothManager::class.java)?.adapter?.takeIf { it.isEnabled }
 
-    // ------------------------------------------------------------ sharing (this phone has data)
+    // ------------------------------------------------------------ offering (fetched with data, or passed on)
 
-    fun share(context: Context, packet: ByteArray) {
-        wire = packet
-        stopListening(context)
-        if (bluetoothAllowed(context)) shareBle(context)
-        if (nearbyAllowed(context) && !nearbySharing) {
-            nearbySharing = true
+    fun offer(context: Context, buses: ByteArray?, board: ByteArray?) {
+        if (buses == null && board == null) return stopOffering(context)
+        this.buses = buses
+        this.board = board
+        if (bluetoothAllowed(context)) offerBle(context)
+        if (nearbyAllowed(context) && !nearbyOffering) {
+            nearbyOffering = true
             Nearby.getConnectionsClient(context).startAdvertising("p", NEARBY_ID, sender(context),
                 AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build())
-                .addOnFailureListener { nearbySharing = false; Log.w(TAG, "nearby advertising", it) }
+                .addOnFailureListener { nearbyOffering = false; Log.w(TAG, "nearby advertising", it) }
         }
     }
 
-    private fun shareBle(context: Context) {
+    private fun offerBle(context: Context) {
         val manager = context.getSystemService(BluetoothManager::class.java) ?: return
         val bluetooth = adapter(context) ?: return
         if (gattServer == null) {
             gattServer = manager.openGattServer(context, object : BluetoothGattServerCallback() {
                 override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int, characteristic: BluetoothGattCharacteristic) {
-                    val value = wire ?: ByteArray(0)
+                    val value = (if (characteristic.uuid == BOARD) board else buses) ?: ByteArray(0)
                     val part = if (offset <= value.size) value.copyOfRange(offset, value.size) else ByteArray(0)
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, part)
                 }
             })?.also { server ->
                 server.addService(BluetoothGattService(SERVICE, BluetoothGattService.SERVICE_TYPE_PRIMARY).apply {
-                    addCharacteristic(BluetoothGattCharacteristic(PACKET, BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ))
+                    listOf(BUSES, BOARD).forEach {
+                        addCharacteristic(BluetoothGattCharacteristic(it, BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ))
+                    }
                 })
             }
         }
@@ -133,44 +142,46 @@ object P2pRadio {
         }
     }
 
-    /** Nearby: whoever connects gets the packet, then the connection closes. */
+    /** Nearby: whoever connects gets the packets, then the connection closes. */
     private fun sender(context: Context) = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             Nearby.getConnectionsClient(context).acceptConnection(endpointId, object : PayloadCallback() {
                 override fun onPayloadReceived(endpointId: String, payload: Payload) = Unit
-                override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-                    if (update.status != PayloadTransferUpdate.Status.IN_PROGRESS) Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId)
-                }
+                override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) = Unit
             })
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-            val packet = wire
-            if (result.status.isSuccess && packet != null) Nearby.getConnectionsClient(context).sendPayload(endpointId, Payload.fromBytes(packet))
-            else Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId)
+            val client = Nearby.getConnectionsClient(context)
+            val packets = listOfNotNull(buses, board)
+            if (!result.status.isSuccess || packets.isEmpty()) return client.disconnectFromEndpoint(endpointId)
+            packets.forEach { client.sendPayload(endpointId, Payload.fromBytes(it)) }
+            // The listener closes once it has them; this is in case it doesn't.
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ client.disconnectFromEndpoint(endpointId) }, 10_000L)
         }
 
         override fun onDisconnected(endpointId: String) = Unit
     }
 
-    fun stopSharing(context: Context) {
-        wire = null
+    fun stopOffering(context: Context) {
+        buses = null
+        board = null
         runCatching { advertising?.let { adapter(context)?.bluetoothLeAdvertiser?.stopAdvertising(it) } }
         advertising = null
         runCatching { gattServer?.close() }
         gattServer = null
-        if (nearbySharing) runCatching { Nearby.getConnectionsClient(context).stopAdvertising() }
-        nearbySharing = false
+        if (nearbyOffering) runCatching { Nearby.getConnectionsClient(context).stopAdvertising() }
+        nearbyOffering = false
     }
 
     // ------------------------------------------------------------ listening (this phone has no data)
 
-    fun listen(context: Context) {
-        stopSharing(context)
+    /** [onPacket]: a packet was taken (emHUB's and fresh), so it can be passed on. */
+    fun listen(context: Context, onPacket: () -> Unit) {
         if (bluetoothAllowed(context) && scanning == null) {
             adapter(context)?.bluetoothLeScanner?.let { scanner ->
                 scanning = object : ScanCallback() {
-                    override fun onScanResult(callbackType: Int, result: ScanResult) = readBle(context, result.device)
+                    override fun onScanResult(callbackType: Int, result: ScanResult) = readBle(context, result.device, onPacket)
                     override fun onScanFailed(errorCode: Int) { Log.w(TAG, "BLE scan failed: $errorCode"); scanning = null }
                 }
                 scanner.startScan(
@@ -186,7 +197,7 @@ object P2pRadio {
             client.startDiscovery(NEARBY_ID, object : EndpointDiscoveryCallback() {
                 override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
                     if (!fresh("nearby:$endpointId")) return
-                    client.requestConnection("p", endpointId, receiver(context))
+                    client.requestConnection("p", endpointId, receiver(context, onPacket))
                 }
                 override fun onEndpointLost(endpointId: String) = Unit
             }, DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build())
@@ -203,16 +214,18 @@ object P2pRadio {
         true
     }
 
-    private fun take(packet: ByteArray?, from: String) {
-        val pack = packet?.let { P2pPack.read(it, System.currentTimeMillis()) }
-        Log.i(TAG, if (pack != null) "packet from $from: ${pack.buses.size} buses" else "packet from $from refused")
-        pack?.let(P2pStore::add)
+    private fun take(packet: ByteArray?, from: String, onPacket: () -> Unit) {
+        val taken = packet?.isNotEmpty() == true && P2pStore.take(packet)
+        Log.i(TAG, "packet from $from: " + if (taken) "taken" else "refused")
+        if (taken) onPacket()
     }
 
-    private fun readBle(context: Context, device: BluetoothDevice) {
+    /** Reads both values (buses, then the stop), one after the other, then closes. */
+    private fun readBle(context: Context, device: BluetoothDevice, onPacket: () -> Unit) {
         if (reading || !fresh("ble:${device.address}")) return
         reading = true
         device.connectGatt(context, false, object : BluetoothGattCallback() {
+            private val queue = ArrayDeque<BluetoothGattCharacteristic>()
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 when {
                     status != BluetoothGatt.GATT_SUCCESS -> done(gatt)
@@ -222,16 +235,23 @@ object P2pRadio {
             }
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) { gatt.discoverServices() }
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                val packet = gatt.getService(SERVICE)?.getCharacteristic(PACKET)
-                if (packet == null || !gatt.readCharacteristic(packet)) done(gatt)
+                gatt.getService(SERVICE)?.let { service -> listOf(BUSES, BOARD).mapNotNullTo(queue) { service.getCharacteristic(it) } }
+                next(gatt)
+            }
+            private fun next(gatt: BluetoothGatt) {
+                val c = queue.removeFirstOrNull() ?: return done(gatt)
+                if (!gatt.readCharacteristic(c)) done(gatt)
             }
             @Deprecated("Android 12 and older")
             override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-                if (Build.VERSION.SDK_INT < 33) { take(characteristic.value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE"); done(gatt) }
+                if (Build.VERSION.SDK_INT < 33) {
+                    take(characteristic.value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE", onPacket)
+                    next(gatt)
+                }
             }
             override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
-                take(value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE")
-                done(gatt)
+                take(value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE", onPacket)
+                next(gatt)
             }
             private fun done(gatt: BluetoothGatt) {
                 runCatching { gatt.close() }
@@ -240,16 +260,16 @@ object P2pRadio {
         }, BluetoothDevice.TRANSPORT_LE)
     }
 
-    /** Nearby: accept the phone we asked, take its packet, close. Nothing is sent from here. */
-    private fun receiver(context: Context) = object : ConnectionLifecycleCallback() {
+    /** Nearby: accept the phone we asked, take its packets, close after a moment. Nothing is sent from here. */
+    private fun receiver(context: Context, onPacket: () -> Unit) = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             Nearby.getConnectionsClient(context).acceptConnection(endpointId, object : PayloadCallback() {
-                override fun onPayloadReceived(endpointId: String, payload: Payload) {
-                    take(payload.asBytes(), "Nearby")
-                    Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId)
-                }
+                override fun onPayloadReceived(endpointId: String, payload: Payload) = take(payload.asBytes(), "Nearby", onPacket)
                 override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) = Unit
             })
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId)
+            }, 5_000L)
         }
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) = Unit
         override fun onDisconnected(endpointId: String) = Unit
@@ -263,32 +283,43 @@ object P2pRadio {
     }
 
     fun stop(context: Context) {
-        stopSharing(context)
+        stopOffering(context)
         stopListening(context)
     }
 }
 
 /**
- * When to shout and when to listen, asked by the follow service every round: with the setting on, a phone with a
- * working connection shares the packet for where it is (fetched once a minute), one without listens.
+ * When to fetch, offer and listen, asked by the follow service every round, with the setting on. With a working
+ * connection: the packets for where the phone is (fetched once a minute) are offered. Without: it listens, and passes on
+ * the newest packets it heard, so one phone with data reaches the phones beyond its own range.
  */
 object P2p {
     private var fetchedAt = 0L
+    private val turn = kotlinx.coroutines.sync.Mutex()
 
     fun online(context: Context): Boolean = runCatching {
         val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
         cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     }.getOrDefault(false)
 
-    suspend fun tick(context: Context, at: Pair<Double, Double>?) {
+    suspend fun tick(context: Context, at: Pair<Double, Double>?) = turn.withLock { round(context, at) }
+
+    private suspend fun round(context: Context, at: Pair<Double, Double>?) {
         if (!com.ksjd.testem.CredentialsManager(context).getP2pNearby() || !com.ksjd.testem.hub.HubClient.isConfigured) return stop(context)
-        if (!online(context)) return P2pRadio.listen(context)
+        if (!online(context)) {
+            fetchedAt = 0L
+            val passOn = { P2pRadio.offer(context, P2pStore.busesWire?.second, P2pStore.boardWire?.second) }
+            P2pRadio.listen(context, passOn)
+            return passOn()
+        }
+        P2pRadio.stopListening(context)
+        P2pStore.clearWires()
         val now = System.currentTimeMillis()
-        if (at == null || now - fetchedAt < 60_000L) { P2pRadio.wire?.let { P2pRadio.share(context, it) }; return }
+        if (at == null || now - fetchedAt < 60_000L) return
         fetchedAt = now
-        val packet = runCatching { com.ksjd.testem.hub.HubClient.p2pPack(at.first, at.second) }
-            .onFailure { android.util.Log.w("P2p", "packet", it) }.getOrNull()
-        if (packet != null) P2pRadio.share(context, packet) else P2pRadio.stopSharing(context)
+        val packets = runCatching { com.ksjd.testem.hub.HubClient.p2pPack(at.first, at.second) }
+            .onFailure { android.util.Log.w("P2p", "packets", it) }.getOrNull()
+        P2pRadio.offer(context, packets?.first, packets?.second)
     }
 
     fun stop(context: Context) {
