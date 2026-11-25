@@ -736,11 +736,21 @@ private fun ReminderSettings(app: AppState, viewModel: AppViewModel) {
 private fun SecuritySettings(app: AppState, viewModel: AppViewModel) {
     var showChangePin by remember { mutableStateOf(false) }
     if (showChangePin) ChangePinDialog(viewModel) { showChangePin = false }
+    // EM-0106: "Never" only after a warning: anyone holding the unlocked phone sees the ticket and the account.
+    var askNever by remember { mutableStateOf(false) }
+    if (askNever) AlertDialog(
+        onDismissRequest = { askNever = false },
+        title = { Text(stringResource(R.string.lock_never_title)) },
+        text = { Text(stringResource(R.string.lock_never_warning)) },
+        confirmButton = { TextButton(onClick = { askNever = false; viewModel.setLockTimeoutSeconds(-1) }) { Text(stringResource(R.string.lock_never_confirm)) } },
+        dismissButton = { TextButton(onClick = { askNever = false }) { Text(stringResource(R.string.cancel)) } }
+    )
     val timeouts = listOf(
         0 to stringResource(R.string.lock_timeout_immediately),
         30 to stringResource(R.string.lock_timeout_30_seconds),
         60 to stringResource(R.string.lock_timeout_1_minute),
-        300 to stringResource(R.string.lock_timeout_5_minutes)
+        300 to stringResource(R.string.lock_timeout_5_minutes),
+        -1 to stringResource(R.string.lock_timeout_never)
     )
     SectionLabel(stringResource(R.string.lock_timeout_title))
     ListGroup {
@@ -748,8 +758,9 @@ private fun SecuritySettings(app: AppState, viewModel: AppViewModel) {
             if (index > 0) GroupDivider()
             ListRow(
                 title = label,
-                onClick = { viewModel.setLockTimeoutSeconds(seconds) },
-                trailing = { RadioButton(selected = app.lockTimeoutSeconds == seconds, onClick = { viewModel.setLockTimeoutSeconds(seconds) }) }
+                onClick = { if (seconds < 0) askNever = true else viewModel.setLockTimeoutSeconds(seconds) },
+                trailing = { RadioButton(selected = app.lockTimeoutSeconds == seconds,
+                    onClick = { if (seconds < 0) askNever = true else viewModel.setLockTimeoutSeconds(seconds) }) }
             )
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Share
@@ -640,6 +643,13 @@ private fun TripTimeline(
             val expectedMs = if (stop.actualMs != null || delays.getOrNull(index) != null) expected[index] else null
             val isAlight = stop.order == alightOrder
             val isBoard = !isAlight && stop.order == boardOrder
+            // EM-0095: getting on and getting off look different at a glance: on in the theme's second colour (tertiary),
+            // off in its main one, each with its own icon, an edge on the left and a square on the line.
+            val mark = when {
+                isBoard -> MaterialTheme.colorScheme.tertiary
+                isAlight -> primary
+                else -> null
+            }
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -648,16 +658,18 @@ private fun TripTimeline(
                     .then(
                         when {
                             isAlight -> Modifier.background(MaterialTheme.colorScheme.primaryContainer)
-                            isBoard -> Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                            isBoard -> Modifier.background(MaterialTheme.colorScheme.tertiaryContainer)
                             else -> Modifier
                         }
                     ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // The getting-on or getting-off edge.
+                Box(Modifier.width(5.dp).fillMaxHeight().background(mark ?: Color.Transparent))
                 // Rail with a stop marker; passed stops are drawn in the brand colour.
                 Box(
                     Modifier
-                        .padding(start = 28.dp)
+                        .padding(start = 23.dp)
                         .width(20.dp)
                         .fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -672,7 +684,8 @@ private fun TripTimeline(
                             )
                             .background(if (passed) primary else muted)
                     )
-                    Box(
+                    if (mark != null) Box(Modifier.size(14.dp).background(mark, RoundedCornerShape(3.dp)))
+                    else Box(
                         Modifier
                             .size(if (isNext) 14.dp else 10.dp)
                             .background(if (passed || isNext) primary else MaterialTheme.colorScheme.surface, CircleShape)
@@ -688,11 +701,10 @@ private fun TripTimeline(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (isAlight) {
-                        Text(stringResource(R.string.track_your_stop), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (isBoard) {
-                        Text(stringResource(R.string.track_board_stop), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    if (mark != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (isBoard) Icons.AutoMirrored.Outlined.Login else Icons.AutoMirrored.Outlined.Logout, null, tint = mark, modifier = Modifier.size(16.dp))
+                        Text(stringResource(if (isBoard) R.string.track_board_stop else R.string.track_your_stop), style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold, color = mark, modifier = Modifier.padding(start = 4.dp))
                     }
                     stop.goesOnAs?.let { line ->
                         Text(stringResource(R.string.track_goes_on_as, line), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,

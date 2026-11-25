@@ -74,7 +74,9 @@ data class BugReport(
     val platform: String = "android",
     val appVersion: String = BuildConfig.VERSION_NAME,
     /** The app's language ("sk", "en"): emHUB writes to the reporter in it. */
-    val language: String = java.util.Locale.getDefault().language
+    val language: String = java.util.Locale.getDefault().language,
+    /** One MP4 or MOV, at most 50 MB (emHUB blanks where it was filmed); streamed, never held in memory. */
+    val video: java.io.File? = null
 )
 
 /** emhub: timetables (planner, other carriers, stop lists), bug reports and community bus delays. */
@@ -107,7 +109,32 @@ object HubClient {
             addProperty("consent", true)
             add("images", JsonArray().apply { report.images.forEach(::add) })
         }
-        post("bugs", body).get("code").asString
+        val video = report.video
+        if (video == null || com.ksjd.testem.Demo.on) return@withContext post("bugs", body).get("code").asString
+        // The JSON as usual, its last field the video in base64 written straight from the file: a 50 MB video would
+        // otherwise sit in memory three times over (bytes, base64, JSON). Content-Length is known: emHUB needs it.
+        val head = body.toString().dropLast(1).toByteArray(Charsets.UTF_8) + ",\"video\":\"".toByteArray()
+        val tail = "\"}".toByteArray()
+        val encoded = (video.length() + 2) / 3 * 4
+        val streamed = object : okhttp3.RequestBody() {
+            override fun contentType() = JSON
+            override fun contentLength() = head.size + encoded + tail.size
+            override fun writeTo(sink: okio.BufferedSink) {
+                sink.write(head)
+                // Base64OutputStream closes what it wraps: the sink must stay open for the tail.
+                val keepOpen = object : java.io.FilterOutputStream(sink.outputStream()) { override fun close() = flush() }
+                android.util.Base64OutputStream(keepOpen, android.util.Base64.NO_WRAP).use { out -> video.inputStream().use { it.copyTo(out, 64 * 1024) } }
+                sink.write(tail)
+            }
+        }
+        val request = Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/bugs").post(streamed)
+            .header("X-App-Key", BuildConfig.HUB_APP_KEY).header("X-App-Version", "android ${BuildConfig.VERSION_NAME}").build()
+        // Up to 67 MB on mobile data: minutes, not the usual minute.
+        client.newBuilder().writeTimeout(10, TimeUnit.MINUTES).readTimeout(2, TimeUnit.MINUTES).build().newCall(request).execute().use { response ->
+            val json = runCatching { JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject }.getOrNull() ?: JsonObject()
+            if (!response.isSuccessful) throw IOException(json.get("error")?.asString ?: "HTTP ${response.code}")
+            json.get("code").asString
+        }
     }
 
     suspend fun reportPosition(

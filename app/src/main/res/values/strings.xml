@@ -565,7 +565,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="planner_goes_on_as">Stay on, goes on as %1$s</string>
     <string name="track_goes_on_as">Goes on as line %1$s: stay on</string>
     <string name="whats_new_version" translatable="false">2.18.5</string>
-    <string name="whats_new_body">• Shared rides open right in Plan&amp;Ride: a link someone sends you shows that bus\'s stops in the app, not in the browser.\n• Shared links now lead to the web version\'s new address, app.par.karafa.net, for friends without the app.\n• Trolleybuses in Banská Bystrica from DPMBB\'s timetables.</string>
+    <string name="whats_new_body">• Shared rides open right in Plan&amp;Ride: a link someone sends you shows that bus\'s stops in the app, not in the browser.\n• Shared links now lead to the web version\'s new address, app.par.karafa.net, for friends without the app.\n• Trolleybuses in Banská Bystrica from DPMBB\'s timetables.\n• Rode a city bus a little earlier (followed in the app)? The planner prices the next one as its change: Banská Bystrica 0,10 €, Zvolen free.\n• Where you get on and off is marked in two colours in a bus\'s stops.\n• Screenshots with a missing connection, and a video with a bug report.\n• The lock can be turned off in Security (with a warning).</string>
     <string name="topup_button">Add credit</string>
     <string name="topup_title">Add credit to your card</string>
     <string name="topup_card">Card %1$s · credit now %2$s</string>
@@ -875,4 +875,15 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="place_pick_clear">Forget it</string>
     <string name="track_alert_arriving_body_timetable">By the timetable; the bus may be late. Get ready at %1$s.</string>
     <string name="track_alert_arriving_body_timetable_train">By the timetable; the train may be late. Get ready at %1$s.</string>
+    <string name="lock_timeout_never">Never (no lock)</string>
+    <string name="lock_never_title">Turn the lock off?</string>
+    <string name="lock_never_warning">Anyone who picks up your unlocked phone will see your ticket, credit, history and account. Your PIN stays set: choose a time here to lock again.</string>
+    <string name="lock_never_confirm">Turn off</string>
+    <string name="bug_video">Add a video</string>
+    <string name="bug_video_hint">One, up to 50 MB, e.g. a screen recording of the problem. Where it was filmed is removed.</string>
+    <string name="bug_video_big">That video is larger than 50 MB. Choose a shorter one.</string>
+    <string name="bug_video_size">Video, %1$.1f MB</string>
+    <string name="bug_video_remove">Remove video</string>
+    <string name="submit_images">Add screenshots (up to 3)</string>
+    <string name="submit_images_count">%1$d of 3 screenshots, tap to add more</string>
 </resources>

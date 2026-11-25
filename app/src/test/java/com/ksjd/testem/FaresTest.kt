@@ -88,4 +88,47 @@ class FaresTest {
         assertEquals("full", Fares.category(listOf("Public transport card")))
         assertEquals("full", Fares.category(emptyList()))
     }
+
+    /** EM-0110: the city ticket bought before the journey, from the city buses the rider followed. */
+    @Test
+    fun aTicketBoughtBeforeCarriesItsChange() {
+        val named = Fares.parse(json.replace("\"id\": \"mhd-zv\",", "\"id\": \"mhd-zv\", \"name\": \"MHD Zvolen\",")
+            .replace("\"id\": \"mhd-bb\",", "\"id\": \"mhd-bb\", \"name\": \"MHD Banská Bystrica\","))!!
+        val day = java.time.LocalDate.of(2026, 11, 24)
+        fun ms(h: Int, m: Int) = day.atTime(h, m).atZone(SK_ZONE).toInstant().toEpochMilli()
+        fun rode(town: String, h: Int, m: Int) = Fares.CityRide(town, ms(h, m))
+        fun leg(at: String, tariff: String) = TimetableSegment("Bus 7", "MHD", at, "A", at, "B", tariff = tariff, serviceDate = day.toString())
+        fun price(held: HeldTicket?, vararg legs: TimetableSegment) = Fares.cost(named, legs.toList(), "student", false, false, held).sadzvCents
+
+        // Banská Bystrica: rode at 13:00, plans at 13:20: the next city bus is the change, 0,10.
+        val held = Fares.heldTicket(named, listOf(rode("Banská Bystrica", 13, 0)), now = ms(13, 20))!!
+        assertEquals(HeldTicket("mhd-bb", ms(13, 0), false), held)
+        assertEquals(10, price(held, leg("13:30", "mhd-bb")))
+        // ...only within its 45 minutes, and the bus after that change is a new ticket.
+        assertEquals(30, price(held, leg("13:50", "mhd-bb")))
+        assertEquals(40, price(held, leg("13:30", "mhd-bb"), leg("13:35", "mhd-bb")))
+        // Rode twice already (the second was the change): a new ticket.
+        val used = Fares.heldTicket(named, listOf(rode("Banská Bystrica", 13, 0), rode("Banská Bystrica", 13, 10)), now = ms(13, 20))!!
+        assertTrue(used.changed)
+        assertEquals(30, price(used, leg("13:30", "mhd-bb")))
+        // A third ride after the change was a new ticket of its own, with its change unused.
+        val third = Fares.heldTicket(named, listOf(rode("Banská Bystrica", 13, 0), rode("Banská Bystrica", 13, 10), rode("Banská Bystrica", 13, 15)), now = ms(13, 20))!!
+        assertEquals(HeldTicket("mhd-bb", ms(13, 15), false), third)
+        // Too old: nothing held.
+        assertEquals(null, Fares.heldTicket(named, listOf(rode("Banská Bystrica", 13, 0)), now = ms(13, 50)))
+
+        // Zvolen: the change costs nothing, any number of times, counted from the first ride.
+        val zv = Fares.heldTicket(named, listOf(rode("Zvolen", 8, 0), rode("Zvolen", 8, 15)), now = ms(8, 20))!!
+        assertEquals(HeldTicket("mhd-zv", ms(8, 0), false), zv)
+        assertEquals(0, price(zv, leg("8:30", "mhd-zv")))
+        // Another town's ticket doesn't help.
+        assertEquals(27, price(held, leg("13:30", "mhd-zv")))
+
+        // Which buses count: city buses and trolleybuses at a stop of either town, not regional lines or trains.
+        assertEquals("Banská Bystrica", Fares.cityTown("6", "Banská Bystrica, Štadlerovo nábrežie"))
+        assertEquals("Zvolen", Fares.cityTown("Bus 10", "Zvolen, Námestie SNP"))
+        assertEquals(null, Fares.cityTown("060411", "Zvolen, AS"))
+        assertEquals(null, Fares.cityTown("R 842", "Zvolen, osobná stanica"))
+        assertEquals(null, Fares.cityTown("7", "Brezno, AS"))
+    }
 }

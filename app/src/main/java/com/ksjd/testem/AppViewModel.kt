@@ -144,7 +144,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             themeMode = prefs.getThemeMode(),
             backgroundColor = prefs.getBackgroundColor(),
             isPinSet = pinSet,
-            isAppUnlocked = !pinSet || isDemo(),
+            // EM-0106: a negative timeout is "never lock" (the user chose it after a warning).
+            isAppUnlocked = !pinSet || isDemo() || prefs.getLockTimeoutSeconds() < 0,
             biometricEnabled = prefs.getBiometricEnabled(),
             lockTimeoutSeconds = prefs.getLockTimeoutSeconds(),
             lowCreditWarningThreshold = prefs.getLowCreditWarningThreshold(),
@@ -563,7 +564,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun onAppForegrounded() {
         isInForeground = true
         val state = _appState.value
-        if (state.isPinSet && lastBackgroundTimeMs != 0L) {
+        if (state.isPinSet && state.lockTimeoutSeconds >= 0 && lastBackgroundTimeMs != 0L) {
             val timeoutMs = state.lockTimeoutSeconds * 1000L
             if (timeoutMs == 0L || System.currentTimeMillis() - lastBackgroundTimeMs >= timeoutMs) lock()
         }
@@ -620,9 +621,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _appState.update { it.copy(biometricEnabled = enabled) }
     }
 
+    /** [seconds] < 0: never lock (EM-0106); the PIN stays set, so choosing a time again locks as before. */
     fun setLockTimeoutSeconds(seconds: Int) {
         prefs.saveLockTimeoutSeconds(seconds)
         _appState.update { it.copy(lockTimeoutSeconds = seconds) }
+        if (seconds < 0 && !_appState.value.isAppUnlocked) onUnlocked()
     }
 
     // ============================================================ reminders

@@ -10,6 +10,8 @@ import com.google.gson.JsonParser
  */
 data class Tariff(
     val id: String,
+    /** "MHD Zvolen", "MHD Banská Bystrica", "IDS BBSK": a city tariff's town is its name after "MHD ". */
+    val name: String = "",
     /** One price for a ride (city buses); else the price goes by tariff units (IDS BBSK). */
     val flat: Boolean,
     /** Flat: a card ticket lasts this long; a change within it costs [transferCents] (0: any number of changes). */
@@ -30,6 +32,12 @@ data class Tariff(
         else -> bands.firstOrNull { units <= it.first }?.let { if (columns[category] == "discount") it.third else it.second }
     }
 }
+
+/**
+ * EM-0110: a city ticket bought on the card shortly before (from the account's history): its change can still be used,
+ * so the next city bus costs the change's price (Banská Bystrica 0,10 €, Zvolen nothing) instead of a new ticket.
+ */
+data class HeldTicket(val tariffId: String, val boughtMs: Long, val changed: Boolean)
 
 /** What a journey takes from each credit. [unknown]: a bus on it has no price, so the sums are a minimum. */
 data class JourneyCost(val sadzvCents: Int, val idsCents: Int, val unknown: Boolean, val train: Boolean = false,
@@ -59,7 +67,7 @@ object Fares {
         JsonParser.parseString(json).asJsonObject.getAsJsonArray("tariffs").map { it.asJsonObject }.associate { t ->
             val id = t.get("id").asString
             id to if (t.get("kind").asString == "flat") Tariff(
-                id, flat = true,
+                id, name = t.get("name")?.asString.orEmpty(), flat = true,
                 transferMinutes = t.get("transferMinutes")?.asInt ?: 0,
                 transferCents = t.get("transferCents")?.asInt ?: 0,
                 prices = t.getAsJsonObject("prices").let { p -> p.keySet().associateWith { cents(p, it) } }
@@ -95,7 +103,9 @@ object Fares {
      * City buses: a card ticket lasts [Tariff.transferMinutes], and a change within it costs [Tariff.transferCents]
      * (Zvolen: nothing, any number of changes; Banská Bystrica: 0,10 € for the first change, then a new ticket).
      */
-    fun cost(tariffs: Map<String, Tariff>, segments: List<TimetableSegment>, category: String, cityPass: Boolean, regionPass: Boolean): JourneyCost {
+    fun cost(tariffs: Map<String, Tariff>, segments: List<TimetableSegment>, category: String, cityPass: Boolean, regionPass: Boolean,
+             /** EM-0110: a city ticket from the card's history whose change may still be used. */ held: HeldTicket? = null): JourneyCost {
+        var carried = held
         var sadzv = 0
         var ids = 0
         var unknown = false
@@ -139,6 +149,17 @@ object Fares {
             closeRegion()
             if (cityPass) { covered = true; return@forEach }
             val at = minuteOfDay(s.departureTime)
+            // EM-0110: the first city bus of the journey may ride on the ticket bought before it (within its time).
+            val leaves = epochMs(s)
+            val fromBefore = carried?.takeIf { ticket == null && it.tariffId == tariff.id && tariff.transferMinutes > 0 && leaves != null &&
+                leaves - it.boughtMs in 0..tariff.transferMinutes * 60_000L && (tariff.transferCents == 0 || !it.changed) }
+            carried = null
+            if (fromBefore != null) {
+                sadzv += tariff.transferCents
+                val bought = java.time.Instant.ofEpochMilli(fromBefore.boughtMs).atZone(SK_ZONE)
+                ticket = Triple(tariff.id, bought.hour * 60 + bought.minute, tariff.transferCents > 0)
+                return@forEach
+            }
             val held = ticket?.takeIf { (id, since, used) ->
                 id == tariff.id && tariff.transferMinutes > 0 && (at - since + 1440) % 1440 <= tariff.transferMinutes &&
                     (tariff.transferCents == 0 || !used)
@@ -153,6 +174,44 @@ object Fares {
         }
         closeRegion()
         return JourneyCost(sadzv, ids, unknown, train, covered)
+    }
+
+    /** When a leg leaves (its date and time in Slovakia), null if either is missing. */
+    private fun epochMs(s: TimetableSegment): Long? = runCatching {
+        java.time.LocalDate.parse(s.serviceDate).atStartOfDay(SK_ZONE).plusMinutes(minuteOfDay(s.departureTime).toLong()).toInstant().toEpochMilli()
+    }.getOrNull()
+
+    /** EM-0110: a city bus the rider rode (followed in the app): its town ("Zvolen") and when it left their stop. */
+    data class CityRide(val town: String, val boardedMs: Long)
+
+    /** The town of a city bus boarded at [stopName] ("Banská Bystrica, Námestie slobody"), null for any other bus. */
+    fun cityTown(line: String, stopName: String): String? {
+        // Regional SAD lines are six digits (060411), trains have letters; city buses and trolleybuses are short numbers.
+        // A train is its kind and number ("R 842", EM-0119): a word in front counts only when it is "Bus".
+        val words = line.trim().split(" ")
+        if ((words.size > 1 && words[0] != "Bus") || !Regex("""\d{1,3}[A-Z]?""").matches(words.last())) return null
+        return listOf("Zvolen", "Banská Bystrica").firstOrNull { stopName.startsWith("$it,") }
+    }
+
+    /**
+     * EM-0110: the city ticket still in its time, from the city buses the rider followed (the app knows when each left
+     * their stop; the card's history arrives too late). Replayed by the tariff's rules: a ride within the ticket's time is
+     * its change (Banská Bystrica one, at 0,10 €; Zvolen any number, free), else a new ticket. Null when there is none.
+     */
+    fun heldTicket(tariffs: Map<String, Tariff>, rides: List<CityRide>, now: Long = System.currentTimeMillis()): HeldTicket? {
+        val byTown = tariffs.values.filter { it.flat && it.transferMinutes > 0 && it.name.startsWith("MHD ") }
+            .associateBy { it.name.removePrefix("MHD ").trim() }
+        var ticket: HeldTicket? = null
+        rides.sortedBy { it.boardedMs }.forEach { r ->
+            val t = byTown[r.town] ?: return@forEach
+            val current = ticket
+            ticket = if (current != null && current.tariffId == t.id && r.boardedMs - current.boughtMs <= t.transferMinutes * 60_000L &&
+                (t.transferCents == 0 || !current.changed)) current.copy(changed = t.transferCents > 0)
+            else HeldTicket(t.id, r.boardedMs, false)
+        }
+        val last = ticket ?: return null
+        val minutes = tariffs[last.tariffId]?.transferMinutes ?: return null
+        return last.takeIf { now - it.boughtMs <= minutes * 60_000L }
     }
 
     private fun minuteOfDay(clock: String): Int =

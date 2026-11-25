@@ -8,6 +8,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +62,16 @@ fun SubmitDialog(
     var text by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // EM-0120: screenshots (where the connection was seen, a timetable at the stop), up to 3; cleaned like a report's.
+    var images by remember { mutableStateOf(listOf<android.net.Uri>()) }
+    val pickImages = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(3)
+    ) { picked ->
+        scope.launch {
+            val copies = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { picked.mapNotNull { runCatching { keepReportImage(context, it) }.getOrNull() } }
+            images = (images + copies).distinct().take(3)
+        }
+    }
     val clock = Regex("""\d{1,2}:\d{2}""")
     // A connection needs both stops picked from the list (the timetable's own stops) and its two times.
     val tripReady = from?.value2 == com.ksjd.testem.TimetableService.HUB_STOP && to?.value2 == com.ksjd.testem.TimetableService.HUB_STOP
@@ -94,8 +106,13 @@ fun SubmitDialog(
                 }
             }
             prefs.saveSubmitName(name.trim())
-            runCatching { HubClient.submit(body) }
+            runCatching {
+                val encoded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { images.map { encodeReportImage(context, it) } }
+                body.add("images", JsonArray().apply { encoded.forEach(::add) })
+                HubClient.submit(body)
+            }
                 .onSuccess {
+                    images.forEach { u -> u.path?.let { p -> java.io.File(p).delete() } }
                     android.widget.Toast.makeText(context, R.string.submit_thanks, android.widget.Toast.LENGTH_LONG).show()
                     onDismiss()
                 }
@@ -143,6 +160,19 @@ fun SubmitDialog(
                     SubmitKind.Problem -> {
                         Text(stopName, style = MaterialTheme.typography.titleSmall)
                         OutlinedTextField(text, { text = it.take(2000) }, label = { Text(stringResource(R.string.submit_problem)) }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                // EM-0120: screenshots of where the connection was seen.
+                TextButton(onClick = {
+                    pickImages.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }, enabled = images.size < 3) {
+                    Text(if (images.isEmpty()) stringResource(R.string.submit_images) else stringResource(R.string.submit_images_count, images.size))
+                }
+                if (images.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    images.forEachIndexed { i, uri ->
+                        androidx.compose.material3.InputChip(selected = false, onClick = { images = images - uri; uri.path?.let { java.io.File(it).delete() } },
+                            label = { Text(stringResource(R.string.bug_image, i + 1)) },
+                            trailingIcon = { androidx.compose.material3.Icon(Icons.Outlined.Close, stringResource(R.string.bug_image_remove)) })
                     }
                 }
                 OutlinedTextField(name, { name = it.take(60) }, label = { Text(stringResource(R.string.submit_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())

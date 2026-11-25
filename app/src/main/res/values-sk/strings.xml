@@ -584,7 +584,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_battery_needed">Sledovanie sa môže zastaviť, keď telefón Plan&amp;Ride na pozadí uspí. V nastaveniach aplikácie nastavte Batériu na Neobmedzené.</string>
     <string name="follow_battery_open">Otvoriť nastavenia</string>
     <string name="follow_battery_later">Teraz nie</string>
-    <string name="whats_new_body">• Zdieľané spoje sa otvoria priamo v Plan&amp;Ride: odkaz, ktorý vám niekto pošle, ukáže zastávky autobusu v aplikácii, nie v prehliadači.\n• Zdieľané odkazy vedú na novú adresu webovej verzie, app.par.karafa.net, pre známych bez aplikácie.\n• Trolejbusy v Banskej Bystrici podľa cestovných poriadkov DPMBB.</string>
+    <string name="whats_new_body">• Zdieľané spoje sa otvoria priamo v Plan&amp;Ride: odkaz, ktorý vám niekto pošle, ukáže zastávky autobusu v aplikácii, nie v prehliadači.\n• Zdieľané odkazy vedú na novú adresu webovej verzie, app.par.karafa.net, pre známych bez aplikácie.\n• Trolejbusy v Banskej Bystrici podľa cestovných poriadkov DPMBB.\n• Išli ste chvíľu predtým MHD a sledovali ste ju v aplikácii? Plánovač ocení ďalší autobus MHD ako prestup: Banská Bystrica 0,10 €, Zvolen zadarmo.\n• Kde nastupujete a vystupujete, je v zastávkach autobusu odlíšené dvoma farbami.\n• Snímky obrazovky k chýbajúcemu spoju a video k nahláseniu chyby.\n• Zámok sa dá vypnúť v Zabezpečení (s upozornením).</string>
     <string name="topup_button">Dobiť kredit</string>
     <string name="topup_title">Dobitie kreditu na kartu</string>
     <string name="topup_card">Karta %1$s · teraz %2$s</string>
@@ -891,4 +891,15 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="place_pick_clear">Zabudnúť</string>
     <string name="track_alert_arriving_body_timetable">Podľa cestovného poriadku, autobus môže meškať. Pripravte sa na zastávke %1$s.</string>
     <string name="track_alert_arriving_body_timetable_train">Podľa cestovného poriadku, vlak môže meškať. Pripravte sa na zastávke %1$s.</string>
+    <string name="lock_timeout_never">Nikdy (bez zámku)</string>
+    <string name="lock_never_title">Vypnúť zámok?</string>
+    <string name="lock_never_warning">Ktokoľvek, kto vezme váš odomknutý telefón, uvidí váš lístok, kredit, históriu a účet. PIN zostane nastavený: výberom času tu aplikáciu znova zamknete.</string>
+    <string name="lock_never_confirm">Vypnúť</string>
+    <string name="bug_video">Pridať video</string>
+    <string name="bug_video_hint">Jedno, najviac 50 MB, napr. záznam obrazovky s problémom. Miesto, kde bolo nakrútené, sa odstráni.</string>
+    <string name="bug_video_big">Video má viac ako 50 MB. Vyberte kratšie.</string>
+    <string name="bug_video_size">Video, %1$.1f MB</string>
+    <string name="bug_video_remove">Odstrániť video</string>
+    <string name="submit_images">Pridať snímky obrazovky (najviac 3)</string>
+    <string name="submit_images_count">Snímky: %1$d z 3, ťuknutím pridáte ďalšie</string>
 </resources>

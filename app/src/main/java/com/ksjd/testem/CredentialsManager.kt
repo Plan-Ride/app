@@ -278,6 +278,29 @@ class CredentialsManager(context: Context) {
     fun saveBiometricEnabled(enabled: Boolean) = prefs.edit().putBoolean("biometric_enabled", enabled).apply()
     fun getBiometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", true)
 
+    /**
+     * EM-0110: city buses ridden in the last 3 hours (followed in the app), for the change's price in the planner. One
+     * per trip ([key]), however often the follow updates.
+     */
+    fun addCityRide(town: String, boardedMs: Long, key: String) {
+        val now = System.currentTimeMillis()
+        val kept = runCatching { org.json.JSONArray(prefs.getString("city_rides", "[]")) }.getOrNull() ?: org.json.JSONArray()
+        val out = org.json.JSONArray()
+        for (i in 0 until kept.length()) {
+            val r = kept.optJSONArray(i) ?: continue
+            if (now - r.optLong(1) < 3 * 3_600_000L && r.optString(2) != key) out.put(r)
+        }
+        out.put(org.json.JSONArray().put(town).put(boardedMs).put(key))
+        prefs.edit().putString("city_rides", out.toString()).apply()
+    }
+
+    fun getCityRides(): List<Fares.CityRide> {
+        val now = System.currentTimeMillis()
+        val kept = runCatching { org.json.JSONArray(prefs.getString("city_rides", "[]")) }.getOrNull() ?: return emptyList()
+        return (0 until kept.length()).mapNotNull { kept.optJSONArray(it) }
+            .filter { now - it.optLong(1) < 3 * 3_600_000L }.map { Fares.CityRide(it.optString(0), it.optLong(1)) }
+    }
+
     fun saveLockTimeoutSeconds(seconds: Int) = prefs.edit().putInt("lock_timeout_seconds", seconds).apply()
     fun getLockTimeoutSeconds(): Int = prefs.getInt("lock_timeout_seconds", 0)
 

@@ -351,6 +351,8 @@ class TripTrackerService : Service() {
     /** The rider's own report (delay seconds, when); wins until the pooled delay is newer. */
     private var localDelay: Pair<Int, Long>? = null
     private var lastDetail: TripDetail? = null
+    /** EM-0110: the followed trip whose boarding was recorded (once per trip). */
+    private var recordedRide: String? = null
     private var reportNote: String? = null
     /** Waiting at the stop: after "Bus is here" the button becomes "Bus is leaving", then goes away. */
     private var herePressed = false
@@ -1156,6 +1158,13 @@ class TripTrackerService : Service() {
 
     private fun sendAlerts(trip: TrackedTrip, p: TripProgress) {
         val line = trip.ref.line
+        // EM-0110: a city bus that left the rider's stop with them on it: when its ticket was bought, for the planner.
+        if (p.onBoard && p.boardingIndex != null && p.boardingExpectedMs > 0) {
+            com.ksjd.testem.Fares.cityTown(line, p.boardingStopName)?.let { town ->
+                val key = "${trip.ref.line}|${trip.ref.tripNumber}|${trip.ref.serviceDate}|${p.boardingIndex}"
+                if (key != recordedRide) { recordedRide = key; prefs.addCityRide(town, p.boardingExpectedMs, key) }
+            }
+        }
         val lead = prefs.getArrivalAlertMinutes()
         if (!p.onBoard && p.secondsToBoarding in 0..lead * 60) {
             notifyAlert(

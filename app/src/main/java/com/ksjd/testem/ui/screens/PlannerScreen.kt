@@ -134,6 +134,9 @@ fun PlannerScreen(
     val fareTicket by viewModel.ticketState.collectAsState()
     val fareIds by viewModel.idsState.collectAsState()
     LaunchedEffect(Unit) { com.ksjd.testem.Fares.refresh(fareContext) }
+    // EM-0110: a city bus ridden a little earlier (followed in the app) makes the next one cost its change; read again
+    // with each search.
+    val cityRides = remember(state.connections) { com.ksjd.testem.CredentialsManager(fareContext).getCityRides() }
     // A regular ride being edited (new ones come from a result's Repeat button).
     var editing by remember { mutableStateOf<Pair<RecurringRide, Boolean>?>(null) }
     editing?.let { (ride, isNew) ->
@@ -206,8 +209,8 @@ fun PlannerScreen(
             items(state.connections, key = { it.id }) { connection ->
                 ConnectionCard(
                     connection = connection,
-                    fare = remember(connection, tariffs, fareTicket.selectedCard, fareIds.account) {
-                        fareNote(fareContext, tariffs, connection, fareTicket.selectedCard, fareIds.account)
+                    fare = remember(connection, tariffs, fareTicket.selectedCard, fareIds.account, cityRides) {
+                        fareNote(fareContext, tariffs, connection, fareTicket.selectedCard, fareIds.account, cityRides)
                     },
                     saved = state.savedJourneys.any { it.sameAs(connection) },
                     onToggleSave = { viewModel.toggleSaveJourney(connection) },
@@ -874,7 +877,8 @@ private fun shareText(connection: TimetableConnection): String = buildString {
  */
 private fun fareNote(
     context: android.content.Context, tariffs: Map<String, com.ksjd.testem.Tariff>?, connection: TimetableConnection,
-    card: com.ksjd.testem.AccountDetails?, ids: com.ksjd.testem.IdsAccount?
+    card: com.ksjd.testem.AccountDetails?, ids: com.ksjd.testem.IdsAccount?,
+    rides: List<com.ksjd.testem.Fares.CityRide> = emptyList()
 ): Pair<String?, String?> {
     if (tariffs == null) return null to null
     val now = System.currentTimeMillis()
@@ -883,7 +887,8 @@ private fun fareNote(
     val category = com.ksjd.testem.Fares.category(listOfNotNull(card?.cardTypeName) + ids?.tickets.orEmpty().map { it.name })
     // ponytail: any valid IDS BBSK season ticket counts as covering the regional buses (a Sieťovka does; a Časovka
     // only its zones, which the e-shop page doesn't list), and a valid SAD Zvolen one as covering both cities.
-    val cost = com.ksjd.testem.Fares.cost(tariffs, connection.segments, category, cityPass, passes.isNotEmpty())
+    val held = com.ksjd.testem.Fares.heldTicket(tariffs, rides, now)
+    val cost = com.ksjd.testem.Fares.cost(tariffs, connection.segments, category, cityPass, passes.isNotEmpty(), held)
     val price = when {
         cost.totalCents == 0 && cost.covered -> context.getString(R.string.fare_covered)
         cost.totalCents == 0 -> null

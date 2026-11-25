@@ -415,8 +415,24 @@ private val CATEGORIES = listOf(
     "other" to R.string.bug_cat_other
 )
 
+/**
+ * A picked video copied into the app (report_images/) as it is: a phone can't shrink it the way it does photos, and
+ * emHUB checks it and blanks where it was filmed. Null when it is over 50 MB.
+ */
+internal fun keepReportVideo(context: Context, uri: Uri): java.io.File? {
+    val size = context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+    if (size > MAX_REPORT_VIDEO) return null
+    val dir = java.io.File(context.filesDir, "report_images").apply { mkdirs() }
+    val file = java.io.File(dir, java.util.UUID.randomUUID().toString() + ".mp4")
+    context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } }
+    if (file.length() > MAX_REPORT_VIDEO || file.length() == 0L) { file.delete(); return null }
+    return file
+}
+
+internal const val MAX_REPORT_VIDEO = 50_000_000L
+
 /** A picked photo copied into the app (report_images/), so an unsent draft keeps it; returns the copy's file URI. */
-private fun keepReportImage(context: Context, uri: Uri): Uri {
+internal fun keepReportImage(context: Context, uri: Uri): Uri {
     val dir = java.io.File(context.filesDir, "report_images").apply { mkdirs() }
     val file = java.io.File(dir, java.util.UUID.randomUUID().toString() + ".jpg")
     file.writeBytes(Base64.decode(encodeReportImage(context, uri), Base64.NO_WRAP))
@@ -424,7 +440,7 @@ private fun keepReportImage(context: Context, uri: Uri): Uri {
 }
 
 /** A picked photo for a report: at most 1600 px on the longer side, re-encoded as JPEG (which drops EXIF, e.g. GPS), base64. */
-private fun encodeReportImage(context: Context, uri: Uri): String {
+internal fun encodeReportImage(context: Context, uri: Uri): String {
     val resolver = context.contentResolver
     val bitmap = if (Build.VERSION.SDK_INT >= 28) {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
@@ -483,6 +499,17 @@ fun BugReportForm(viewModel: AppViewModel, onDone: () -> Unit, feature: Boolean 
     var sentCode by rememberSaveable { mutableStateOf("") }
     var logs by remember { mutableStateOf("") }
     var images by remember { mutableStateOf(draft?.images.orEmpty().map(Uri::parse).filter { it.path?.let { p -> java.io.File(p).exists() } == true }) }
+    // One video, as on the web (emHUB 1.62.0). ponytail: not kept in the draft; add it to ReportDraft if people lose them.
+    var video by remember { mutableStateOf<java.io.File?>(null) }
+    var videoTooBig by remember { mutableStateOf(false) }
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+        if (picked == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val kept = withContext(Dispatchers.IO) { runCatching { keepReportVideo(context, picked) }.getOrNull() }
+            videoTooBig = kept == null
+            if (kept != null) { video?.delete(); video = kept }
+        }
+    }
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(5)) { picked ->
         // Kept as small copies in the app, so a draft still has its photos after the app was closed.
         scope.launch {
@@ -554,6 +581,20 @@ fun BugReportForm(viewModel: AppViewModel, onDone: () -> Unit, feature: Boolean 
         }
     }
     Spacer(Modifier.height(8.dp))
+    ListGroup {
+        ListRow(
+            stringResource(R.string.bug_video),
+            subtitle = stringResource(if (videoTooBig) R.string.bug_video_big else R.string.bug_video_hint),
+            onClick = { pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
+        )
+    }
+    video?.let { file ->
+        InputChip(selected = false, onClick = { file.delete(); video = null },
+            label = { Text(stringResource(R.string.bug_video_size, file.length() / 1_000_000.0)) },
+            trailingIcon = { Icon(Icons.Outlined.Close, stringResource(R.string.bug_video_remove), Modifier.size(18.dp)) },
+            modifier = Modifier.padding(horizontal = 16.dp))
+    }
+    Spacer(Modifier.height(8.dp))
     if (!feature) ListGroup {
         ListRow(
             stringResource(R.string.bug_logs),
@@ -614,13 +655,14 @@ fun BugReportForm(viewModel: AppViewModel, onDone: () -> Unit, feature: Boolean 
                     val watch = if (AppLogs.fromWatch) AppLogs.watchInfo(context) else null
                     HubClient.submitBug(
                         BugReport(category, title.trim(), description.trim(), name.trim(), email.trim(), watch?.second ?: AppLogs.device(),
-                            if (attachLogs) logs else "", kind = if (feature) "feature" else "bug", images = encoded,
+                            if (attachLogs) logs else "", kind = if (feature) "feature" else "bug", images = encoded, video = video,
                             platform = if (watch != null) "wearos" else "android", appVersion = watch?.first ?: com.ksjd.testem.BuildConfig.VERSION_NAME)
                     ).also { AppLogs.fromWatch = false }
                 }.onSuccess {
                     sentCode = it
                     Haptics.perform(view, Haptics.CONFIRM)
                     images.forEach { u -> u.path?.let { p -> java.io.File(p).delete() } }
+                    video?.delete(); video = null
                     images = emptyList(); title = ""; description = ""
                     prefs.saveReportDraft(feature, null)
                 }
