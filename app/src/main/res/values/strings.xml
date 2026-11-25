@@ -564,8 +564,8 @@ On the next screen, choose “Allow all the time”.</string>
     <!-- Update for every release (shown once after updating, when the user opted in). -->
     <string name="planner_goes_on_as">Stay on, goes on as %1$s</string>
     <string name="track_goes_on_as">Goes on as line %1$s: stay on</string>
-    <string name="whats_new_version" translatable="false">2.18.5</string>
-    <string name="whats_new_body">• Shared rides open right in Plan&amp;Ride: a link someone sends you shows that bus\'s stops in the app, not in the browser.\n• Shared links now lead to the web version\'s new address, app.par.karafa.net, for friends without the app.\n• Trolleybuses in Banská Bystrica from DPMBB\'s timetables.\n• Rode a city bus a little earlier (followed in the app)? The planner prices the next one as its change: Banská Bystrica 0,10 €, Zvolen free.\n• Where you get on and off is marked in two colours in a bus\'s stops.\n• Screenshots with a missing connection, and a video with a bug report.\n• The lock can be turned off in Security (with a warning).</string>
+    <string name="whats_new_version" translatable="false">2.19.0</string>
+    <string name="whats_new_body">• No data? Plan&amp;Ride keeps following your bus on what it last knew and your own GPS, and says so on the card.\n• Help phones without data nearby (Settings): over Bluetooth your phone passes on the delays it knows, and hears them when you have none. Only delays signed by Plan&amp;Ride count; nothing about you is sent.\n• Your change bus counts its delay from a phone nearby too, so you know if you will make it.</string>
     <string name="topup_button">Add credit</string>
     <string name="topup_title">Add credit to your card</string>
     <string name="topup_card">Card %1$s · credit now %2$s</string>
@@ -739,6 +739,10 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="trip_stops_missing">The operator data leaves out some stops of this ride, so fewer stops are shown than it really has.</string>
     <string name="journey_get_off">Get off at %1$s, %2$s</string>
     <string name="journey_next_leg">Then line %1$s: %2$s</string>
+    <string name="journey_whole">The whole journey</string>
+    <string name="journey_now">Following now</string>
+    <string name="journey_change_wait">Change: %1$d min at %2$s</string>
+    <string name="journey_there_at">There at %1$s</string>
     <string name="planner_nearest_stop">Nearest stop</string>
     <string name="planner_no_stop_near">No stop found near you</string>
     <string name="catch_car_switch">I go to my stop by car</string>
@@ -867,6 +871,11 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="source_zsr">Railways of the Slovak Republic (ŽSR)</string>
     <string name="source_zsr_what">Train timetables, from the national open data catalogue. CC BY 1.0</string>
     <string name="planner_walk_to">Walk %1$d min to %2$s</string>
+    <string name="p2p_switch">Help phones without data nearby</string>
+    <string name="p2p_switch_hint">Over Bluetooth, your phone passes on bus delays it knows to Plan&amp;Ride users nearby who have no data, and hears them when you have none. Only delays signed by Plan&amp;Ride count, and nothing about you or where you are going is sent. Works while you follow a bus.</string>
+    <string name="p2p_offline">No connection: what was known %1$d min ago, and your GPS</string>
+    <string name="p2p_heard">Delay from a phone nearby, checked by Plan&amp;Ride</string>
+    <string name="p2p_nearby_short">from a phone nearby</string>
     <string name="walk_other_switch">Walk to other stops</string>
     <string name="walk_other_switch_hint">A connection may start or end with a short walk to a nearby stop. Off: it starts and ends exactly at the stops you chose; a change between buses can still be a short walk to another stop.</string>
     <string name="place_pick_title">Set %1$s</string>

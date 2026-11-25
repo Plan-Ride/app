@@ -26,7 +26,8 @@ object RoutePosition {
         lon: Double,
         coords: List<Pair<Double, Double>?>,
         maxMeters: Double,
-        expectedIndex: Float? = null
+        expectedIndex: Float? = null,
+        roads: List<List<Pair<Double, Double>>?>? = null
     ): Pair<Float, Double>? {
         var best: Triple<Float, Double, Double>? = null // index, distance, cost
         val k = cos(Math.toRadians(lat))
@@ -34,21 +35,28 @@ object RoutePosition {
         for (i in 0 until coords.size - 1) {
             val a = coords[i] ?: continue
             val b = coords[i + 1] ?: continue
-            val (ax, ay) = xy(a)
-            val (bx, by) = xy(b)
-            val dx = bx - ax
-            val dy = by - ay
-            val len2 = dx * dx + dy * dy
-            val t = if (len2 == 0.0) 0.0 else (-(ax * dx + ay * dy) / len2).coerceIn(0.0, 1.0)
-            val px = ax + t * dx
-            val py = ay + t * dy
-            val d = sqrt(px * px + py * py)
-            // Stops are joined by straight lines, but roads bend: between intercity stops km apart
+            // EM-0126: the road between the stops (emHUB's trace) when known. On the straight line a bus in Banská Bystrica's
+            // centre was 100-200 m "off the route" for minutes, its departures were seen late and the delay jumped.
+            val road = roads?.getOrNull(i).orEmpty()
+            val points = (listOf(a) + road + b).map(::xy)
+            var length = 0.0
+            var hop: Pair<Double, Double>? = null // distance, metres along the hop
+            for ((p, q) in points.zipWithNext()) {
+                val dx = q.first - p.first
+                val dy = q.second - p.second
+                val len2 = dx * dx + dy * dy
+                val t = if (len2 == 0.0) 0.0 else (-(p.first * dx + p.second * dy) / len2).coerceIn(0.0, 1.0)
+                val d = sqrt((p.first + t * dx).let { it * it } + (p.second + t * dy).let { it * it })
+                if (hop == null || d < hop.first) hop = d to length + t * sqrt(len2)
+                length += sqrt(len2)
+            }
+            val (d, along) = hop ?: continue
+            // Stops are joined by straight lines when there's no trace, but roads bend: between intercity stops km apart
             // the road can run hundreds of metres off that line. Allow 10 % of the hop, but only beside it: beyond
             // its end the rider isn't on this road (EM-0063: 1.5 km past a stop counted as standing at it).
-            val beside = t > 0.0 && t < 1.0
-            if (d > if (beside) maxOf(maxMeters, sqrt(len2) * HOP_SLACK) else maxMeters) continue
-            val index = (i + t).toFloat()
+            val beside = road.isEmpty() && along > 0.0 && along < length
+            if (d > if (beside) maxOf(maxMeters, length * HOP_SLACK) else maxMeters) continue
+            val index = (i + if (length == 0.0) 0.0 else along / length).toFloat()
             // Being two or more stops away from where the bus should be costs like 150 m per stop.
             val cost = d + (expectedIndex?.let { (abs(index - it) - 2f).coerceAtLeast(0f) * 150.0 } ?: 0.0)
             if (best == null || cost < best.third) best = Triple(index, d, cost)

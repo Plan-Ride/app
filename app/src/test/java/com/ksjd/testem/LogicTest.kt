@@ -98,4 +98,12 @@ class LogicTest {
         assertEquals("c", RideScheduler.pick(listOf(conn("a", "7:24", "106"), conn("c", "7:30", "101")), ride, at)?.id)
         assertNull(RideScheduler.pick(listOf(conn("x", "9:00", "5")), ride, at))
     }
+
+    @Test fun sadzvCityLinesAreCity() {
+        // EM-0128: S.A.D. Zvolen's live board gives no kind; its 1-3 digit lines are city buses.
+        org.junit.Assert.assertEquals("city", com.ksjd.testem.ui.components.lineKind("21"))
+        org.junit.Assert.assertEquals("bus", com.ksjd.testem.ui.components.lineKind("606104"))
+        org.junit.Assert.assertEquals("bus", com.ksjd.testem.ui.components.lineKind("744", "bus"))
+        org.junit.Assert.assertEquals("rail", com.ksjd.testem.ui.components.lineKind("R 842"))
+    }
 }

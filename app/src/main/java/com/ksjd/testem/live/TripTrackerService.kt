@@ -360,6 +360,9 @@ class TripTrackerService : Service() {
 
     // Catch estimate: location stays on the phone.
     private var stopLatLon: Pair<Double, Double>? = null
+    /** 2.19.0: when the trip was last fetched, and the share/listen round for phones nearby. */
+    private var fetchedAt = 0L
+    private var p2pJob: kotlinx.coroutines.Job? = null
     private var stopLookupDone = false
     private var lastFix: android.location.Location? = null
     /** EM-0072: the router's drive to the stop (by car), and where and when it was asked. */
@@ -379,6 +382,8 @@ class TripTrackerService : Service() {
     private var riderListener: android.location.LocationListener? = null
     private var routeCoords: List<Pair<Double, Double>?>? = null
     private var routeCoordsLoading = false
+    /** EM-0126: emHUB's road trace from each stop to the next (null: a straight line). */
+    private var routeRoads: List<List<Pair<Double, Double>>?>? = null
     private var lastRiderIndex = -1f
     /** The phone moves along the route past the boarding stop: the rider is on the bus. */
     private var ridingBus = false
@@ -544,6 +549,7 @@ class TripTrackerService : Service() {
         stopLookupDone = false
         stopRiderTracking()
         routeCoords = null
+        routeRoads = null
         lastRiderIndex = -1f
         ridingBus = false
         checkIndex = -1f
@@ -606,6 +612,27 @@ class TripTrackerService : Service() {
     private fun wantsLocation() = prefs.getCatchEnabled() || prefs.getCommunityMode() == COMMUNITY_AUTO
 
     /** The rider's own report wins until the pooled community delay is newer. */
+    /** emHUB's road traces between neighbouring stops, by the index of the stop each starts at (as the bus map draws them). */
+    private fun roadsBetween(coords: List<Pair<Double, Double>?>): List<List<Pair<Double, Double>>?> {
+        val known = coords.indices.filter { coords[it] != null }
+        val stops = known.joinToString(";") { i -> "%.6f,%.6f".format(java.util.Locale.ROOT, coords[i]!!.first, coords[i]!!.second) }
+        val hops = HubClient.timetable("path", mapOf("stops" to stops)).getAsJsonArray("hops")
+        val roads = MutableList<List<Pair<Double, Double>>?>(coords.size) { null }
+        known.zipWithNext().forEachIndexed { j, (a, b) ->
+            if (b == a + 1 && j < hops.size()) roads[a] = hops[j].asJsonArray.map { p -> p.asJsonArray.let { it[0].asDouble to it[1].asDouble } }.ifEmpty { null }
+        }
+        return roads
+    }
+
+    /** The last known trip while there is no connection, with a nearby phone's newer delay when one was heard. */
+    private fun offlineDetail(current: TrackedTrip): TripDetail? {
+        val known = lastDetail ?: return null
+        if (com.ksjd.testem.p2p.P2p.online(this)) return null
+        val heard = com.ksjd.testem.p2p.P2pStore.about(current.ref)?.takeIf { it.atMs > fetchedAt }
+        val base = known.copy(offlineSinceMs = fetchedAt, positionSource = if (known.positionSource.isLive) PositionSource.BusDelay else known.positionSource)
+        return heard?.let { base.withDelay(it.delaySeconds).copy(positionSource = PositionSource.Nearby) } ?: base
+    }
+
     private fun withLocalDelay(detail: TripDetail): TripDetail {
         val (delay, at) = localDelay ?: return detail
         val communityAt = detail.community?.updatedAtMs ?: 0L
@@ -637,7 +664,8 @@ class TripTrackerService : Service() {
                 routeCoords = runCatching { repo.withCoordinates(current.ref, detail) }
                     .onFailure { Log.w(GPS_TAG, "stop coordinates failed", it) }.getOrNull()
                     ?.stops?.map { s -> s.lat?.let { it to s.lon!! } }
-                Log.i(GPS_TAG, "stop coordinates: ${routeCoords?.count { it != null }} of ${detail.stops.size}")
+                routeRoads = routeCoords?.let { coords -> runCatching { kotlinx.coroutines.withContext(Dispatchers.IO) { roadsBetween(coords) } }.onFailure { Log.w(GPS_TAG, "road traces failed", it) }.getOrNull() }
+                Log.i(GPS_TAG, "stop coordinates: ${routeCoords?.count { it != null }} of ${detail.stops.size}, roads ${routeRoads?.count { it != null }}")
                 routeCoordsLoading = false
             }
         }
@@ -690,8 +718,8 @@ class TripTrackerService : Service() {
         lastFix = fix
         if (!fix.hasAccuracy() || fix.accuracy > 50f) return Log.i(GPS_TAG, "fix: accuracy ${fix.accuracy} m").let { }
         val p = TripProgress.from(withLocalDelay(detail), current)
-        val (index, meters) = RoutePosition.snap(fix.latitude, fix.longitude, coords, RoutePosition.RIDER_GPS_MAX_M, p.position)
-            ?: return RoutePosition.snap(fix.latitude, fix.longitude, coords, Double.MAX_VALUE).let { nearest ->
+        val (index, meters) = RoutePosition.snap(fix.latitude, fix.longitude, coords, RoutePosition.RIDER_GPS_MAX_M, p.position, routeRoads)
+            ?: return RoutePosition.snap(fix.latitude, fix.longitude, coords, Double.MAX_VALUE, roads = routeRoads).let { nearest ->
                 Log.i(GPS_TAG, "fix: off the route, nearest %.0f m at stop %.1f".format(nearest?.second ?: -1.0, nearest?.first ?: -1f))
             }
         val boarding = (p.boardingIndex ?: 0).toFloat()
@@ -913,7 +941,7 @@ class TripTrackerService : Service() {
         if (fix != null) lastFix = fix
         // EM-0096: the bus was thought to be still coming, but the phone has gone on down the route: the rider may be on it.
         val onRoute = fix?.takeIf { it.accuracy <= 50f }?.let { f ->
-            routeCoords?.let { RoutePosition.snap(f.latitude, f.longitude, it, RoutePosition.RIDER_GPS_MAX_M)?.first }
+            routeCoords?.let { RoutePosition.snap(f.latitude, f.longitude, it, RoutePosition.RIDER_GPS_MAX_M, roads = routeRoads)?.first }
         }
         if (onRoute != null) {
             if (checkIndex >= 0f && onRoute > checkIndex + 0.05f && onRoute > (p.boardingIndex ?: 0) + 0.05f) {
@@ -1030,8 +1058,13 @@ class TripTrackerService : Service() {
                 trip = current
                 TripTracking.set(this@TripTrackerService, current)
             }
-            if (fetched != null && fetched.stops.isNotEmpty()) lastDetail = fetched
-            var detail = fetched?.let(::withLocalDelay)
+            if (fetched != null && fetched.stops.isNotEmpty()) { lastDetail = fetched; fetchedAt = System.currentTimeMillis() }
+            // 2.19.0: no data: the bus is followed on what was known (its stops, its last delay) and this phone's own GPS,
+            // or on a delay a phone nearby passed on (emHUB-signed). Before, following stood still and then ended.
+            var detail = (fetched?.takeIf { it.stops.isNotEmpty() } ?: offlineDetail(current))?.let(::withLocalDelay)
+            if (p2pJob?.isActive != true) {
+                p2pJob = scope.launch { com.ksjd.testem.p2p.P2p.tick(this@TripTrackerService, lastFix?.let { it.latitude to it.longitude } ?: stopLatLon) }
+            }
             if (detail == null || detail.stops.isEmpty()) {
                 failures++
                 if (failures >= 20) {
@@ -1131,7 +1164,9 @@ class TripTrackerService : Service() {
         val stop = detail.stops.getOrNull(alight) ?: return
         val arrival = stop.actualMs ?: (stop.scheduledMs + (detail.delaySeconds ?: 0) * 1000L)
         val date = runCatching { java.time.LocalDate.parse(next.ref.serviceDate) }.getOrNull() ?: return
-        val departure = date.atStartOfDay(com.ksjd.testem.SK_ZONE).toInstant().toEpochMilli() + next.ref.plannedSecondOfDay * 1000L
+        // 2.19.0: a change bus that a phone nearby says is late leaves later (heard only while this phone has no data).
+        val nextLate = com.ksjd.testem.p2p.P2pStore.about(next.ref)?.delaySeconds?.coerceAtLeast(0) ?: 0
+        val departure = date.atStartOfDay(com.ksjd.testem.SK_ZONE).toInstant().toEpochMilli() + (next.ref.plannedSecondOfDay + nextLate) * 1000L
         if (arrival + com.ksjd.testem.TimetableService.changeMinutes * 60_000L <= departure) return
         val changeStop = p.alightStopName ?: stop.name
         val end = current.nextLegs.last().let { it.toStop ?: it.ref.destination }
@@ -1426,6 +1461,7 @@ class TripTrackerService : Service() {
     }
 
     private fun finish() {
+        com.ksjd.testem.p2p.P2p.stop(this)
         // Sharing by code ends with following; so does a shared arrival link ("Arrived" for whoever has it open).
         val app = applicationContext
         val link = TripTracking.eta.value

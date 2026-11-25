@@ -568,6 +568,7 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
             Spacer(Modifier.height(12.dp))
             JourneyDraftBar(Modifier.padding(bottom = 8.dp))
             FollowControls(trip)
+            if (following && tracked!!.nextLegs.isNotEmpty()) WholeJourney(tracked!!, trip.detail?.delaySeconds)
         }
         when {
             trip.isLoading -> Box(
@@ -604,6 +605,62 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
                     { order -> onPickAlight(order.takeIf { it != trip.alightOrder }) }
                 }
             )
+            }
+        }
+    }
+}
+
+/**
+ * The whole journey followed, opened from its card or notification: each bus with where you get on and off and when,
+ * and how long each change is, so the trip with its changes is seen at once (the stops below are this bus's).
+ */
+@Composable
+private fun WholeJourney(first: com.ksjd.testem.live.TrackedTrip, delaySeconds: Int?) {
+    val legs = listOf(first) + first.nextLegs
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.journey_whole), style = MaterialTheme.typography.titleMedium)
+            legs.forEachIndexed { i, leg ->
+                val before = legs.getOrNull(i - 1)
+                if (before != null && before.arrivesAtMs > 0 && leg.departsAtMs > 0) {
+                    Text(
+                        stringResource(R.string.journey_change_wait, ((leg.departsAtMs - before.arrivesAtMs) / 60_000L).toInt().coerceAtLeast(0),
+                            leg.fromStop ?: before.toStop.orEmpty()),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 14.dp)
+                    )
+                }
+                Row(verticalAlignment = Alignment.Top) {
+                    com.ksjd.testem.ui.components.KindPlate(leg.ref.line, com.ksjd.testem.ui.components.lineKind(leg.ref.line))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        val weight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal
+                        listOfNotNull(
+                            leg.fromStop?.let { (if (leg.departsAtMs > 0) Format.clock(leg.departsAtMs) + " " else "") + it },
+                            leg.toStop?.let { (if (leg.arrivesAtMs > 0) Format.clock(leg.arrivesAtMs) + " " else "") + it }
+                        ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = weight) }
+                        // 2.19.0: what a phone nearby said about a later bus (heard only while this phone has no data).
+                        if (i > 0) com.ksjd.testem.p2p.P2pStore.heard.collectAsState().value.let { com.ksjd.testem.p2p.P2pStore.about(leg.ref) }?.let { heard ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                DelayLabel(heard.delaySeconds)
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.p2p_nearby_short), style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (i == 0) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.journey_now), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            if (delaySeconds != null) { Spacer(Modifier.width(6.dp)); DelayLabel(delaySeconds) }
+                        }
+                    }
+                }
+            }
+            legs.last().arrivesAtMs.takeIf { it > 0 }?.let {
+                Text(stringResource(R.string.journey_there_at, Format.clock(it)), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

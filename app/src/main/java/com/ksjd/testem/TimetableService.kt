@@ -386,7 +386,7 @@ class TimetableService {
         /** Least time between two buses (minutes, 0 = any) the planner leaves for a change: the rider's setting. */
         @Volatile var changeMinutes = 1
         /** 2.18.0: the rider's "walk to other stops" setting. */
-        @Volatile var walkOtherStops = true
+        @Volatile var walkOtherStops = false
 
         fun tripUrl(tripId: String, from: Int?, to: Int?): String =
             "hub:trip?id=" + java.net.URLEncoder.encode(tripId, "UTF-8") + (from?.let { "&from=$it" } ?: "") + (to?.let { "&to=$it" } ?: "")

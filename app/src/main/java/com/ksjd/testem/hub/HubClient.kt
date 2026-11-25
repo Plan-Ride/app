@@ -192,6 +192,13 @@ object HubClient {
         return execute(Request.Builder().url(url).get())
     }
 
+    /** 2.19.0: emHUB's signed packet of the live buses around [lat], [lon], to broadcast to phones without data. */
+    suspend fun p2pPack(lat: Double, lon: Double): ByteArray = withContext(Dispatchers.IO) {
+        val url = "${BuildConfig.HUB_URL}/api/v1/p2p/pack".toHttpUrl().newBuilder()
+            .addQueryParameter("lat", "%.3f".format(java.util.Locale.ROOT, lat)).addQueryParameter("lon", "%.3f".format(java.util.Locale.ROOT, lon)).build()
+        okio.ByteString.Companion.run { execute(Request.Builder().url(url).get()).get("wire").asString.decodeBase64() }!!.toByteArray()
+    }
+
     /** 2.18.0: opens the connection to emHUB ahead of the first search; on mobile data that is most of the wait. */
     fun warm() {
         runCatching { client.newCall(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/health").head().build()).execute().close() }

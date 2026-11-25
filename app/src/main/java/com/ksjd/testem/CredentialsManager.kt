@@ -367,7 +367,10 @@ class CredentialsManager(context: Context) {
     /** Use the phone's location (on the phone only) to say whether the user will catch the bus. */
     /** Least time to change buses in the planner, minutes (0 = any connection, however tight). */
     /** 2.18.0: connections may start or end with a walk to another stop (off: only the chosen stops themselves). */
-    fun getWalkToOtherStops(): Boolean = prefs.getBoolean("walk_other_stops", true)
+    /** 2.19.0: share delays with phones without data nearby, and listen to them when this one has none (off by default). */
+    fun getP2pNearby(): Boolean = prefs.getBoolean("p2p_nearby", false)
+    fun saveP2pNearby(on: Boolean) = prefs.edit().putBoolean("p2p_nearby", on).apply()
+    fun getWalkToOtherStops(): Boolean = prefs.getBoolean("walk_other_stops", false)
     fun saveWalkToOtherStops(on: Boolean) = prefs.edit().putBoolean("walk_other_stops", on).apply()
     fun getChangeMinutes(): Int = prefs.getInt("change_minutes", 1)
     fun saveChangeMinutes(minutes: Int) = prefs.edit().putInt("change_minutes", minutes).apply()

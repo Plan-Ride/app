@@ -238,6 +238,14 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                     }
                     Spacer(Modifier.height(8.dp))
                     DelayPill(summary, on)
+                    // 2.19.0: no data: say what the card is going on (when it was last known, or a phone nearby).
+                    view.detail.offlineSinceMs.takeIf { it > 0 }?.let { since ->
+                        Text(
+                            if (view.detail.positionSource == com.ksjd.testem.live.PositionSource.Nearby) stringResource(R.string.p2p_heard)
+                            else stringResource(R.string.p2p_offline, ((now - since) / 60_000L).toInt().coerceAtLeast(0)),
+                            color = on.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     RouteTrack(view, on, summary)
                     Spacer(Modifier.height(6.dp))

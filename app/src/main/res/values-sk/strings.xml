@@ -584,7 +584,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_battery_needed">Sledovanie sa môže zastaviť, keď telefón Plan&amp;Ride na pozadí uspí. V nastaveniach aplikácie nastavte Batériu na Neobmedzené.</string>
     <string name="follow_battery_open">Otvoriť nastavenia</string>
     <string name="follow_battery_later">Teraz nie</string>
-    <string name="whats_new_body">• Zdieľané spoje sa otvoria priamo v Plan&amp;Ride: odkaz, ktorý vám niekto pošle, ukáže zastávky autobusu v aplikácii, nie v prehliadači.\n• Zdieľané odkazy vedú na novú adresu webovej verzie, app.par.karafa.net, pre známych bez aplikácie.\n• Trolejbusy v Banskej Bystrici podľa cestovných poriadkov DPMBB.\n• Išli ste chvíľu predtým MHD a sledovali ste ju v aplikácii? Plánovač ocení ďalší autobus MHD ako prestup: Banská Bystrica 0,10 €, Zvolen zadarmo.\n• Kde nastupujete a vystupujete, je v zastávkach autobusu odlíšené dvoma farbami.\n• Snímky obrazovky k chýbajúcemu spoju a video k nahláseniu chyby.\n• Zámok sa dá vypnúť v Zabezpečení (s upozornením).</string>
+    <string name="whats_new_body">• Bez dát? Plan&amp;Ride sleduje autobus ďalej podľa posledných údajov a vašej polohy a na karte to aj povie.\n• Pomáhať telefónom bez dát v okolí (Nastavenia): cez Bluetooth váš telefón posunie meškania, ktoré pozná, a vypočuje si ich, keď dáta nemáte vy. Platia len meškania podpísané Plan&amp;Ride, nič o vás sa neposiela.\n• Aj meškanie autobusu na prestup sa dozviete od telefónu v okolí, takže viete, či ho stihnete.</string>
     <string name="topup_button">Dobiť kredit</string>
     <string name="topup_title">Dobitie kreditu na kartu</string>
     <string name="topup_card">Karta %1$s · teraz %2$s</string>
@@ -758,6 +758,10 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="trip_stops_missing">Údaje dopravcu pri tomto spoji niektoré zastávky vynechávajú, preto je ich tu menej, ako ich naozaj má.</string>
     <string name="journey_get_off">Vystúpte: %1$s, %2$s</string>
     <string name="journey_next_leg">Potom linka %1$s: %2$s</string>
+    <string name="journey_whole">Celá cesta</string>
+    <string name="journey_now">Teraz sledujete</string>
+    <string name="journey_change_wait">Prestup: %1$d min, %2$s</string>
+    <string name="journey_there_at">V cieli o %1$s</string>
     <string name="planner_nearest_stop">Najbližšia zastávka</string>
     <string name="planner_no_stop_near">V okolí sa nenašla žiadna zastávka</string>
     <string name="catch_car_switch">Na zastávku chodím autom</string>
@@ -883,6 +887,11 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="source_zsr">Železnice Slovenskej republiky</string>
     <string name="source_zsr_what">Cestovný poriadok vlakov z Národného katalógu otvorených dát. CC BY 1.0</string>
     <string name="planner_walk_to">Pešo %1$d min do %2$s</string>
+    <string name="p2p_switch">Pomáhať telefónom bez dát v okolí</string>
+    <string name="p2p_switch_hint">Cez Bluetooth váš telefón posunie meškania, ktoré pozná, používateľom Plan&amp;Ride v okolí bez dát, a vypočuje si ich, keď dáta nemáte vy. Platia len meškania podpísané Plan&amp;Ride a nič o vás ani o tom, kam idete, sa neposiela. Funguje počas sledovania autobusu.</string>
+    <string name="p2p_offline">Bez pripojenia: údaje spred %1$d min a vaša poloha</string>
+    <string name="p2p_heard">Meškanie od telefónu v okolí, overené Plan&amp;Ride</string>
+    <string name="p2p_nearby_short">od telefónu v okolí</string>
     <string name="walk_other_switch">Pešo na inú zastávku</string>
     <string name="walk_other_switch_hint">Spojenie môže začať alebo skončiť krátkou chôdzou na blízku zastávku. Vypnuté: začne a skončí presne na zastávkach, ktoré ste vybrali; pri prestupe môžete stále prejsť pešo na inú zastávku.</string>
     <string name="place_pick_title">Nastaviť: %1$s</string>

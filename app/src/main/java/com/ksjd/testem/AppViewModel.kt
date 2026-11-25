@@ -984,6 +984,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun swapTimetableEnds() {
+        // EM-0129: the results were still the old direction's under the swapped stops: search the new one at once.
+        val shown = _timetableState.value.connections.isNotEmpty()
         fromSuggestionJob?.cancel()
         toSuggestionJob?.cancel()
         _timetableState.update {
@@ -996,7 +998,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 toSuggestions = emptyList()
             )
         }
-        preloadAhead()
+        if (shown) loadTimetables() else preloadAhead()
     }
 
     fun applyRoute(route: SavedRoute, search: Boolean = true) {

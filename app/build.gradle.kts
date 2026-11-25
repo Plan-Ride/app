@@ -27,8 +27,8 @@ android {
         applicationId = "com.ksjd.testem"
         minSdk = 24
         targetSdk = 36
-        versionCode = 43
-        versionName = "2.18.5"
+        versionCode = 45
+        versionName = "2.19.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -125,6 +125,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     // The followed bus on the Plan&Ride watch app (EM-0041).
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    // 2.19.0: delays for phones without data nearby (with plain Bluetooth LE beside it for phones without Google services)
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
     // Opens Plan&Ride's page in the Play Store on the watch (the phone's Play Store doesn't offer the watch app).
     implementation("androidx.wear:wear-remote-interactions:1.1.0")
 

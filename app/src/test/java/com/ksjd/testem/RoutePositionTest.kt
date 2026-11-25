@@ -72,4 +72,15 @@ class RoutePositionTest {
         assertNull(RoutePosition.snap(48.648, 19.12, hop, RoutePosition.RIDER_GPS_MAX_M))
         assertEquals(1f, RoutePosition.snap(48.6355, 19.12, hop, RoutePosition.RIDER_GPS_MAX_M)!!.first, 0.01f)
     }
+
+    @Test
+    fun roadTrace_keepsABendingStreetOnTheRoute() {
+        // EM-0126: two stops 1.1 km apart on one street, the road bowing 200 m to the side: off the straight line, on the trace.
+        val hop = listOf(48.73 to 19.14, 48.74 to 19.14)
+        val road = listOf(listOf(48.7325 to 19.1427, 48.735 to 19.1427, 48.7375 to 19.1427))
+        assertNull(RoutePosition.snap(48.735, 19.1427, hop, RoutePosition.RIDER_GPS_MAX_M))
+        val (index, meters) = RoutePosition.snap(48.735, 19.1427, hop, RoutePosition.RIDER_GPS_MAX_M, roads = road)!!
+        assertEquals(0.5f, index, 0.03f)
+        assertEquals(0.0, meters, 1.0)
+    }
 }

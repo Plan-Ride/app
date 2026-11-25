@@ -367,6 +367,24 @@ private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSig
                 trailing = { Switch(walkOther, setWalkOther) }
             )
             GroupDivider()
+            // 2.19.0: delays for phones without data nearby (Bluetooth LE and Google Nearby), opt-in.
+            var p2p by remember { mutableStateOf(prefs.getP2pNearby()) }
+            val p2pPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+                val on = granted.filterKeys { it != android.Manifest.permission.NEARBY_WIFI_DEVICES }.values.all { it }
+                p2p = on
+                prefs.saveP2pNearby(on)
+            }
+            val setP2p: (Boolean) -> Unit = { on ->
+                if (on) p2pPermissions.launch(com.ksjd.testem.p2p.P2pRadio.permissions())
+                else { p2p = false; prefs.saveP2pNearby(false) }
+            }
+            ListRow(
+                stringResource(R.string.p2p_switch),
+                subtitle = stringResource(R.string.p2p_switch_hint),
+                onClick = { setP2p(!p2p) },
+                trailing = { Switch(p2p, setP2p) }
+            )
+            GroupDivider()
             var haptics by remember { mutableStateOf(prefs.getHapticsEnabled()) }
             val setHaptics: (Boolean) -> Unit = { on ->
                 haptics = on

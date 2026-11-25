@@ -325,12 +325,16 @@ class TicketStubShape(private val cornerRadius: Dp, private val notchRadius: Dp,
 /** Train lines are written with their kind in front: "Os 7308", "R 845", "IC 501", "REX 1810". */
 private val RAIL_LINE = Regex("^(Os|R|REX|RR|Ex|IC|EC|EN|SC|RJ|LE|ZR|Zr|Sp|Sv|Mn|Rx|RE|ICE|NJ|D)\\s*\\d+.*")
 
+private val CITY_LINE = Regex("""\d{1,3}[A-Z]?""")
+
 /** "rail", "tram", "trolleybus", "city" or "bus", from what is known about a line (its kind, vehicle, or how it is written). */
 fun lineKind(line: String, group: String = "", vehicle: String = ""): String = when {
     group == "rail" || vehicle == "rail" || RAIL_LINE.matches(line.trim()) -> "rail"
     vehicle == "tram" -> "tram"
     vehicle == "trolleybus" -> "trolleybus"
     group == "city" -> "city"
+    // EM-0128: S.A.D. Zvolen's live board gives no kind; its city lines are 1-3 digits ("21"), others 6 ("606104").
+    group.isEmpty() && CITY_LINE.matches(line.trim()) -> "city"
     else -> "bus"
 }
 

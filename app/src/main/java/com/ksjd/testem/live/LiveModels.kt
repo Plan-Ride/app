@@ -109,7 +109,9 @@ data class TripDetail(
     /** The bus's own GPS position when it is fresh (to place it on the route). */
     val busPosition: Pair<Double, Double>? = null,
     /** 2.18.0: the timetable's vehicle for trips from emHUB ("rail", "tram", "trolleybus", "bus"); "" when not known. */
-    val vehicle: String = ""
+    val vehicle: String = "",
+    /** 2.19.0: no connection since then (epoch ms): the stops and delay are what was known at that moment. 0: online. */
+    val offlineSinceMs: Long = 0L
 ) {
     /** 2.17.2: the delay at stop [i]: from earlier days that stop's own, else the one delay known for the bus. */
     fun delayAt(i: Int): Int? = if (positionSource == PositionSource.History && history != null) history.atStop(i) else delaySeconds
@@ -121,7 +123,9 @@ data class TripDetail(
 
 enum class PositionSource {
     /** History: the timetable shifted by how late this trip usually is (when the user chose that). */
-    Timetable, History, BusDelay, Riders, BusGps, RiderGps;
+    Timetable, History, BusDelay, Riders, BusGps, RiderGps,
+    /** 2.19.0: this phone has no data; the delay came from a phone nearby in emHUB's signed packet. */
+    Nearby;
 
     /** Someone knows exactly where the bus is: no need to ask riders to tap. */
     val isLive: Boolean get() = this == BusGps || this == RiderGps
