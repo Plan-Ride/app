@@ -55,4 +55,16 @@ class P2pPackTest {
         // 2.19.0: the code a question carries; emHUB's test_hub.py checks the same stop gives 0x234534.
         assertEquals(0x234534, P2pPack.code("banska bystrica plazove kupalisko"))
     }
+
+    @Test fun answersInPiecesComeBackWhole() {
+        // EM-0136: a 500 B answer goes as 200 B pieces; heard in any order (and once), it is whole again.
+        val a = ByteArray(493) { (it * 7).toByte() }
+        val b = ByteArray(120) { (it * 3).toByte() }
+        val pieces = com.ksjd.testem.p2p.P2pRadio.pieces(listOf(a, b))
+        assertEquals(4, pieces.size)
+        val whole = pieces.reversed().mapNotNull { com.ksjd.testem.p2p.P2pRadio.piece(it) }.map { it.second }
+        assertEquals(2, whole.size)
+        org.junit.Assert.assertArrayEquals(a, whole.first { it.size == a.size })
+        org.junit.Assert.assertArrayEquals(b, whole.first { it.size == b.size })
+    }
 }

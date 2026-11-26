@@ -139,6 +139,8 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
         if (granted) vm.findNearby() else vm.onLocationPermissionDenied()
     }
 
+    // 2.19.0: no data and helping phones nearby on: the search asks phones around instead (stops from the offline timetables).
+    val askNearby = com.ksjd.testem.ui.components.rememberAskNearby()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
         item {
             // A code someone told you (they share their bus): it opens here once they accept.
@@ -151,7 +153,7 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
             OutlinedTextField(
                 value = state.query,
                 onValueChange = vm::search,
-                placeholder = { Text(stringResource(R.string.departures_search_hint)) },
+                placeholder = { Text(stringResource(if (askNearby) R.string.p2p_ask_search else R.string.departures_search_hint)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 trailingIcon = {
                     if (state.query.isNotEmpty()) {
@@ -186,6 +188,12 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
             }
         }
 
+        if (state.query.isNotBlank() && askNearby) {
+            item {
+                com.ksjd.testem.ui.components.AskResults(state.query, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { vm.search("") }
+            }
+            return@LazyColumn
+        }
         if (state.query.isNotBlank()) {
             item {
                 if (state.results.isEmpty()) {

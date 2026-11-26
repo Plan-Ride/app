@@ -249,7 +249,7 @@ class LiveRepository(context: Context) {
     suspend fun getTrip(ref: TripRef): TripDetail = withContext(Dispatchers.IO) {
         val base = when {
             // 2.19.0: no data (a bus heard from a phone nearby): its stops and times from the offline timetables.
-            ref.isScheduleOnly -> runCatching { timetableTrip(ref) }.getOrElse { failure ->
+            ref.isScheduleOnly -> runCatching { withCityBus(ref, timetableTrip(ref)) }.getOrElse { failure ->
                 if (failure is kotlinx.coroutines.CancellationException) throw failure
                 com.ksjd.testem.offline.OfflineTimetables.tripDetail(ref) ?: throw failure
             }
@@ -390,6 +390,23 @@ class LiveRepository(context: Context) {
      * The bus as emHUB knows it, for when sadzv's own position is old or sadzv doesn't answer: emHUB reads sadzv too
      * and, while that has nothing fresh, the city's map page (Banská Bystrica).
      */
+    /**
+     * 2.19.0: a city bus followed as a timetable trip (heard from a phone nearby, or the planner on a timetable link) gets
+     * its live delay and position as emHUB knows them (sadzv's GPS, the city's map), today. Followed without data, it went
+     * on by the timetable even after the data came back.
+     */
+    private fun withCityBus(ref: TripRef, trip: TripDetail): TripDetail {
+        val (lineId, number) = trip.cityBus ?: return trip
+        if (ref.serviceDate.isNotBlank() && ref.serviceDate != LocalDate.now(zone).toString()) return trip
+        val bus = hubBus(TripRef(ref.line, lineId, "", number, ref.destination)) ?: return trip
+        val fresh = bus.lat != 0.0 && System.currentTimeMillis() - bus.reportedAtMs in -60_000L..RoutePosition.FRESH_MS
+        return trip.copy(
+            delaySeconds = bus.delaySeconds ?: trip.delaySeconds,
+            positionSource = if (bus.delaySeconds != null) PositionSource.BusDelay else trip.positionSource,
+            busPosition = if (fresh) bus.lat to bus.lon else trip.busPosition
+        )
+    }
+
     private fun hubBus(ref: TripRef): LiveVehicle? {
         if (!com.ksjd.testem.hub.HubClient.isConfigured || ref.lineId == 0L) return null
         val key = "${ref.lineId}-${ref.tripNumber}"
@@ -590,7 +607,9 @@ class LiveRepository(context: Context) {
                 )
             }.orEmpty()
             val mode = json.str("mode")
+            val live = json.get("live")?.takeIf { it.isJsonObject }?.asJsonObject
             return TripDetail(
+                cityBus = live?.let { l -> (l.get("lineId")?.asLong ?: 0L) to (l.get("trip")?.asInt ?: 0) }?.takeIf { it.first > 0 },
                 line = if (mode == "rail") json.str("line").ifBlank { ref.line } else ref.line,
                 vehicle = mode,
                 destination = json.str("headsign").ifBlank { stops.lastOrNull()?.name.orEmpty() },

@@ -878,9 +878,8 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="p2p_nearby_short">from a phone nearby</string>
     <string name="p2p_board_title">Departures: %1$s</string>
     <string name="p2p_board_tap">Tap a bus to follow it.</string>
-    <string name="p2p_ask_title">Another stop, without data</string>
     <string name="p2p_ask_hint">Ask phones around with data for a stop\'s departures. Two other stops nearby are asked too, so nobody can tell which one you want.</string>
-    <string name="p2p_ask_search">Stop from the offline timetables</string>
+    <string name="p2p_ask_search">No data: ask phones nearby for a stop</string>
     <string name="p2p_ask_no_offline">No such stop in your offline timetables. Download your region in Settings.</string>
     <string name="p2p_ask_waiting">Asking phones nearby for departures: %1$s (%2$d s)</string>
     <string name="p2p_ask_stop">Stop asking</string>

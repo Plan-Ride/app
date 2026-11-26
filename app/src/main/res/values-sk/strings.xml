@@ -894,9 +894,8 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="p2p_nearby_short">od telefónu v okolí</string>
     <string name="p2p_board_title">Odchody: %1$s</string>
     <string name="p2p_board_tap">Ťuknite na autobus a budete ho sledovať.</string>
-    <string name="p2p_ask_title">Iná zastávka bez dát</string>
     <string name="p2p_ask_hint">Opýtajte sa telefónov v okolí, ktoré majú dáta, na odchody zo zastávky. Spolu s ňou sa pýtate aj na dve iné zastávky v okolí, takže nikto nevie, ktorú chcete.</string>
-    <string name="p2p_ask_search">Zastávka z offline cestovných poriadkov</string>
+    <string name="p2p_ask_search">Bez dát: opýtať sa telefónov v okolí</string>
     <string name="p2p_ask_no_offline">Takú zastávku vo vašich offline cestovných poriadkoch nemáte. Stiahnite si svoj kraj v Nastaveniach.</string>
     <string name="p2p_ask_waiting">Pýtam sa telefónov v okolí na odchody: %1$s (%2$d s)</string>
     <string name="p2p_ask_stop">Prestať sa pýtať</string>

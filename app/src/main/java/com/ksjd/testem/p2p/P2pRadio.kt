@@ -266,7 +266,9 @@ object P2pRadio {
                         // An answer broadcast one-way (no connection): take it as it is.
                         val broadcast = result.scanRecord?.getServiceData(ParcelUuid(ANSWER))
                         if (broadcast != null) {
-                            if (fresh("answer:" + broadcast.contentHashCode())) take(broadcast, "broadcast ${P2pLog.who(result.device.address)}", onPacket)
+                            piece(broadcast)?.let { (id, whole) ->
+                                if (fresh("answer:$id")) take(whole, "broadcast ${P2pLog.who(result.device.address)}", onPacket)
+                            }
                         } else if (result.scanRecord?.serviceUuids?.contains(ParcelUuid(SERVICE)) == true) {
                             readBle(context, result.device, result.rssi, onPacket)
                         }
@@ -464,12 +466,42 @@ object P2pRadio {
         val oneWay = Build.VERSION.SDK_INT >= 26 && OneWay.supported(bluetooth)
         val room = if (Build.VERSION.SDK_INT >= 26) OneWay.room(bluetooth) else 31
         P2pLog.add("answering ${next.size} stops (${next.sumOf { it.size }} B); one-way broadcast: " +
-            if (oneWay) "yes, room $room B" else "no (this phone can't), readable only")
+            if (oneWay) "yes, in pieces of $PIECE B (room $room B)" else "no (this phone can't), readable only")
         if (!oneWay || !bluetoothAllowed(context) || Build.VERSION.SDK_INT < 26) return
-        next.forEach { wire ->
-            if (wire.size + 20 > room) return@forEach P2pLog.add("answer ${wire.size} B too big for one broadcast here, readable only")
-            OneWay.start(bluetooth, ANSWER, wire)?.let { answerSets += it }
+        if (PIECE + 24 > room) return P2pLog.add("one-way broadcast: room $room B too small, readable only")
+        OneWay.start(bluetooth, ANSWER, pieces(next))?.let { answerSets += it }
+    }
+
+    /**
+     * EM-0136: one broadcast holds ~250 B on Samsung phones (a whole 500 B answer failed, "data too large"): each answer
+     * goes as pieces [answer id (2 B), piece number, pieces] + up to [PIECE] B, which listeners put back together.
+     */
+    private const val PIECE = 200
+
+    internal fun pieces(wires: List<ByteArray>): List<ByteArray> = wires.flatMap { wire ->
+        val id = wire.contentHashCode() and 0xFFFF
+        val count = (wire.size + PIECE - 1) / PIECE
+        (0 until count).map { k ->
+            byteArrayOf((id shr 8).toByte(), id.toByte(), k.toByte(), count.toByte()) + wire.copyOfRange(k * PIECE, minOf(wire.size, (k + 1) * PIECE))
         }
+    }
+
+    /** Pieces heard, by answer id, until each answer is whole. */
+    private val heardPieces = mutableMapOf<Int, Array<ByteArray?>>()
+
+    /** A broadcast piece of an answer; returns the whole answer once all its pieces are in. */
+    internal fun piece(data: ByteArray): Pair<Int, ByteArray>? = synchronized(heardPieces) {
+        if (data.size < 5) return null
+        val id = ((data[0].toInt() and 0xFF) shl 8) or (data[1].toInt() and 0xFF)
+        val k = data[2].toInt() and 0xFF
+        val count = data[3].toInt() and 0xFF
+        if (count == 0 || k >= count || count > 16) return null
+        val parts = heardPieces.getOrPut(id) { arrayOfNulls(count) }.takeIf { it.size == count } ?: arrayOfNulls<ByteArray>(count).also { heardPieces[id] = it }
+        parts[k] = data.copyOfRange(4, data.size)
+        if (heardPieces.size > 20) heardPieces.keys.filter { it != id }.take(heardPieces.size - 20).forEach { heardPieces.remove(it) }
+        if (parts.any { it == null }) return null
+        heardPieces.remove(id)
+        id to parts.fold(ByteArray(0)) { all, p -> all + p!! }
     }
 
     /** Bluetooth 5 extended advertising (Android 8.0+): an answer broadcast nobody connects to. */
@@ -478,27 +510,53 @@ object P2pRadio {
         fun supported(bluetooth: android.bluetooth.BluetoothAdapter) = bluetooth.isLeExtendedAdvertisingSupported
         fun room(bluetooth: android.bluetooth.BluetoothAdapter) = bluetooth.leMaximumAdvertisingDataLength
 
-        fun start(bluetooth: android.bluetooth.BluetoothAdapter, uuid: UUID, wire: ByteArray): Any? {
+        private val main = android.os.Handler(android.os.Looper.getMainLooper())
+        private val cycles = mutableMapOf<Any, Runnable>()
+
+        /** One broadcast cycling through [pieces] (a new one every 300 ms) for 2 minutes. */
+        fun start(bluetooth: android.bluetooth.BluetoothAdapter, uuid: UUID, pieces: List<ByteArray>): Any? {
             val advertiser = bluetooth.bluetoothLeAdvertiser ?: return null
+            if (pieces.isEmpty()) return null
+            fun data(p: ByteArray) = AdvertiseData.Builder().setIncludeDeviceName(false).addServiceData(ParcelUuid(uuid), p).build()
             val cb = object : android.bluetooth.le.AdvertisingSetCallback() {
                 override fun onAdvertisingSetStarted(set: android.bluetooth.le.AdvertisingSet?, txPower: Int, status: Int) {
-                    P2pLog.add(if (status == 0) "BLE: answer broadcast (${wire.size} B)" else "BLE: answer broadcast failed (status $status)")
+                    if (status != 0 || set == null) return P2pLog.add("BLE: answer broadcast failed (status $status)")
+                    P2pLog.add("BLE: answer broadcast (${pieces.size} pieces, ${pieces.sumOf { it.size }} B)")
+                    if (pieces.size < 2) return
+                    var k = 0
+                    val next = object : Runnable {
+                        override fun run() {
+                            k = (k + 1) % pieces.size
+                            runCatching { set.setAdvertisingData(data(pieces[k])) }
+                            main.postDelayed(this, 300L)
+                        }
+                    }
+                    synchronized(cycles) { cycles[this] = next }
+                    main.postDelayed(next, 300L)
+                }
+                override fun onAdvertisingDataSet(set: android.bluetooth.le.AdvertisingSet?, status: Int) {
+                    if (status != 0) P2pLog.add("BLE: answer piece failed (status $status)")
+                }
+                override fun onAdvertisingSetStopped(set: android.bluetooth.le.AdvertisingSet?) {
+                    synchronized(cycles) { cycles.remove(this) }?.let(main::removeCallbacks)
                 }
             }
             return runCatching {
                 advertiser.startAdvertisingSet(
                     android.bluetooth.le.AdvertisingSetParameters.Builder().setLegacyMode(false).setConnectable(false).setScannable(false)
-                        .setInterval(android.bluetooth.le.AdvertisingSetParameters.INTERVAL_MEDIUM)
+                        .setInterval(android.bluetooth.le.AdvertisingSetParameters.INTERVAL_LOW)
                         .setTxPowerLevel(android.bluetooth.le.AdvertisingSetParameters.TX_POWER_MEDIUM).build(),
-                    AdvertiseData.Builder().setIncludeDeviceName(false).addServiceData(ParcelUuid(uuid), wire).build(),
-                    null, null, null, 12_000, 0, cb // 2 minutes, then it ends by itself
+                    data(pieces[0]), null, null, null, 12_000, 0, cb // 2 minutes, then it ends by itself
                 )
                 cb
             }.onFailure { P2pLog.add("BLE: answer broadcast failed: ${it.message}") }.getOrNull()
         }
 
         fun stop(bluetooth: android.bluetooth.BluetoothAdapter, sets: List<Any>) {
-            sets.forEach { cb -> runCatching { bluetooth.bluetoothLeAdvertiser?.stopAdvertisingSet(cb as android.bluetooth.le.AdvertisingSetCallback) } }
+            sets.forEach { cb ->
+                synchronized(cycles) { cycles.remove(cb) }?.let(main::removeCallbacks)
+                runCatching { bluetooth.bluetoothLeAdvertiser?.stopAdvertisingSet(cb as android.bluetooth.le.AdvertisingSetCallback) }
+            }
         }
     }
 
