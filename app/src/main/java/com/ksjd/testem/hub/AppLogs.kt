@@ -59,6 +59,8 @@ object AppLogs {
         File(context.filesDir, WATCH_FILE).takeIf { it.exists() && System.currentTimeMillis() - it.lastModified() < WATCH_FRESH_MS }?.let {
             append("\n--- watch ---\n").append(it.readText().takeLast(80_000)).append('\n')
         }
+        // 2.19.0: phones without data nearby (Bluetooth LE, Nearby): the state now and the recent events.
+        append("\n--- nearby phones ---\n").append(runCatching { com.ksjd.testem.p2p.P2pLog.report(context) }.getOrElse { "unavailable: ${it.message}\n" })
         append("\n--- logcat (this app only) ---\n")
         // All of this app's processes, not only the current one: after a crash the app restarts as a new process,
         // and the lines leading up to the crash belong to the old one. Apps only ever see their own lines.

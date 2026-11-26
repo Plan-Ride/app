@@ -171,6 +171,8 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
             )
+            // 2.19.0: no data: the board a phone nearby passed on.
+            com.ksjd.testem.ui.components.NearbyBoard(System.currentTimeMillis(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (state.stopsFailed) {
                 Notice(
                     stringResource(R.string.departures_stops_failed),
@@ -350,6 +352,7 @@ private fun StopBoard(
             }
         }
         Spacer(Modifier.height(8.dp))
+        val heardDelays by com.ksjd.testem.p2p.P2pStore.heard.collectAsState()
 
         when {
             board.isLoading && board.departures.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -367,6 +370,8 @@ private fun StopBoard(
                     color = colors.boardText
                 )
                 if (board.hasError) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry), color = colors.live) }
+                // 2.19.0: no data: the board a phone nearby passed on (a stop near it, maybe this one).
+                if (board.hasError) com.ksjd.testem.ui.components.NearbyBoard(now, Modifier.padding(top = 12.dp))
             }
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
                 if (board.hasError) {
@@ -379,7 +384,11 @@ private fun StopBoard(
                         )
                     }
                 }
-                items(board.departures, key = { it.key }) { departure ->
+                // 2.19.0: the board can't refresh (no data): a delay a phone nearby passed on, for S.A.D. Zvolen's buses.
+                val heard = if (board.hasError) heardDelays else emptyMap()
+                items(board.departures, key = { it.key }) { listed ->
+                    val departure = if (heard.isEmpty()) listed else com.ksjd.testem.p2p.P2pStore.aboutSadzv(listed.lineId, listed.tripNumber)
+                        ?.let { listed.copy(delaySeconds = it.delaySeconds) } ?: listed
                     val highlighted = board.highlight?.let {
                         it.line.equals(departure.line, ignoreCase = true) &&
                             it.time == Format.secondOfDay(departure.plannedSecondOfDay)
@@ -508,7 +517,7 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
     if (showMap && trip.detail != null) BusMapDialog(trip.ref, trip.detail, alight) { showMap = false }
     var sharing by remember { mutableStateOf(false) }
     if (sharing) {
-        val shared = if (following) tracked!! else com.ksjd.testem.live.TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder)
+        val shared = if (following) tracked!! else trip.journey ?: com.ksjd.testem.live.TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder)
         ShareTripDialog(shared, trip.detail?.destination.orEmpty()) { sharing = false }
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface,
@@ -568,7 +577,9 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
             Spacer(Modifier.height(12.dp))
             JourneyDraftBar(Modifier.padding(bottom = 8.dp))
             FollowControls(trip)
-            if (following && tracked!!.nextLegs.isNotEmpty()) WholeJourney(tracked!!, trip.detail?.delaySeconds)
+            // EM-0133: the whole journey, followed or opened from a shared link (also before it starts).
+            val journey = (if (following) tracked else trip.journey)?.takeIf { it.nextLegs.isNotEmpty() }
+            if (journey != null) WholeJourney(journey, trip.detail?.delaySeconds)
         }
         when {
             trip.isLoading -> Box(
@@ -605,6 +616,11 @@ fun TripSheet(sheet: TripSheetState, onDismiss: () -> Unit, onPickAlight: (Int?)
                     { order -> onPickAlight(order.takeIf { it != trip.alightOrder }) }
                 }
             )
+            // EM-0133: then every later bus of the journey with all its stops, so the whole trip can be read through.
+            (if (following) tracked else trip.journey)?.nextLegs?.forEachIndexed { i, leg ->
+                val before = (if (following) tracked else trip.journey)!!.let { j -> if (i == 0) j else j.nextLegs[i - 1] }
+                LegStops(leg, before)
+            }
             }
         }
     }
@@ -662,6 +678,48 @@ private fun WholeJourney(first: com.ksjd.testem.live.TrackedTrip, delaySeconds: 
                 Text(stringResource(R.string.journey_there_at, Format.clock(it)), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
+
+/** EM-0133: a later bus of a journey: the change to it, then its stops (loaded when the sheet opens), where you get on and off marked. */
+@Composable
+private fun LegStops(leg: com.ksjd.testem.live.TrackedTrip, before: com.ksjd.testem.live.TrackedTrip) {
+    val context = LocalContext.current
+    val detail by androidx.compose.runtime.produceState<com.ksjd.testem.live.TripDetail?>(null, leg.ref) {
+        value = runCatching { com.ksjd.testem.live.LiveRepository(context.applicationContext).getTrip(leg.ref) }.getOrNull()
+    }
+    Column(Modifier.padding(top = 20.dp)) {
+        if (before.arrivesAtMs > 0 && leg.departsAtMs > 0) {
+            Text(
+                stringResource(R.string.journey_change_wait, ((leg.departsAtMs - before.arrivesAtMs) / 60_000L).toInt().coerceAtLeast(0),
+                    leg.fromStop ?: before.toStop.orEmpty()),
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp)) {
+            val kind = com.ksjd.testem.ui.components.lineKind(leg.ref.line, vehicle = detail?.vehicle.orEmpty())
+            com.ksjd.testem.ui.components.KindIcon(kind, size = 24.dp)
+            Spacer(Modifier.width(6.dp))
+            com.ksjd.testem.ui.components.KindPlate(leg.ref.line, kind)
+            Spacer(Modifier.width(10.dp))
+            Text(detail?.destination ?: leg.ref.destination, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        val d = detail
+        when {
+            d == null -> Text(stringResource(R.string.track_loading), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            d.stops.isEmpty() -> Text(stringResource(R.string.trip_unavailable_title), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            else -> TripTimeline(
+                stops = d.stops,
+                delays = d.stops.indices.map(d::delayAt),
+                boardOrder = d.boardingOrder ?: leg.boardingPlatformIds.takeIf { it.isNotEmpty() }?.let { ids -> d.stops.firstOrNull { it.platformId in ids }?.order },
+                alightOrder = leg.alightOrder ?: d.alightOrder,
+                onStopClick = null
+            )
         }
     }
 }
@@ -809,7 +867,8 @@ private fun FollowControls(trip: TripSheetState) {
     val haptic = rememberHaptic()
     val start = {
         haptic(Haptics.CONFIRM)
-        TripTracking.start(context, trip.detail?.let { com.ksjd.testem.live.draftLeg(trip, it).trip } ?: TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder))
+        // EM-0133: a shared journey is followed whole (every bus, one after another).
+        TripTracking.start(context, trip.journey ?: trip.detail?.let { com.ksjd.testem.live.draftLeg(trip, it).trip } ?: TrackedTrip(trip.ref, trip.boardingPlatformIds, trip.alightOrder))
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         denied = !granted

@@ -893,6 +893,12 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="p2p_heard">Meškanie od telefónu v okolí, overené Plan&amp;Ride</string>
     <string name="p2p_nearby_short">od telefónu v okolí</string>
     <string name="p2p_board_title">Odchody: %1$s</string>
+    <string name="p2p_board_tap">Ťuknite na autobus a budete ho sledovať.</string>
+    <string name="p2p_board_following">Sledujete %1$s</string>
+    <string name="p2p_offline_timetable">Bez dát: časy z offline cestovného poriadku</string>
+    <string name="p2p_status_none">Od telefónov v okolí zatiaľ nič</string>
+    <string name="p2p_status_heard">Naposledy prijaté od telefónu v okolí pred %1$d min</string>
+    <string name="p2p_status_offered">Naposledy posunuté telefónu v okolí pred %1$d min</string>
     <string name="p2p_board_from">Bez dát: od telefónu v okolí pred %1$d min, overené Plan&amp;Ride</string>
     <string name="walk_other_switch">Pešo na inú zastávku</string>
     <string name="walk_other_switch_hint">Spojenie môže začať alebo skončiť krátkou chôdzou na blízku zastávku. Vypnuté: začne a skončí presne na zastávkach, ktoré ste vybrali; pri prestupe môžete stále prejsť pešo na inú zastávku.</string>

@@ -111,7 +111,9 @@ data class TripDetail(
     /** 2.18.0: the timetable's vehicle for trips from emHUB ("rail", "tram", "trolleybus", "bus"); "" when not known. */
     val vehicle: String = "",
     /** 2.19.0: no connection since then (epoch ms): the stops and delay are what was known at that moment. 0: online. */
-    val offlineSinceMs: Long = 0L
+    val offlineSinceMs: Long = 0L,
+    /** 2.19.0: built from the offline timetables (no data when following started): stops and times only. */
+    val fromOfflinePack: Boolean = false
 ) {
     /** 2.17.2: the delay at stop [i]: from earlier days that stop's own, else the one delay known for the bus. */
     fun delayAt(i: Int): Int? = if (positionSource == PositionSource.History && history != null) history.atStop(i) else delaySeconds

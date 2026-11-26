@@ -74,6 +74,17 @@ class RoutePositionTest {
     }
 
     @Test
+    fun earlyBusStandingBetweenStops_staysEarly() {
+        // EM-0130: stops at 0, 120 and 240 s; the bus left stop 1 early and stands 70 % of the way to stop 2, 60 s before
+        // stop 1's time: 144 s early there. Against stop 1's time (a bus waiting at a stop) it read only 60 s early.
+        val times = listOf(0L, 120_000L, 240_000L)
+        assertEquals(-144, RoutePosition.delayBetween(1.7f, times, 60_000L))
+        assertEquals(-60, RoutePosition.delayAt(1.7f, times, 60_000L))
+        // Late between stops: both say the same.
+        assertEquals(36, RoutePosition.delayBetween(1.7f, times, 240_000L))
+    }
+
+    @Test
     fun roadTrace_keepsABendingStreetOnTheRoute() {
         // EM-0126: two stops 1.1 km apart on one street, the road bowing 200 m to the side: off the straight line, on the trace.
         val hop = listOf(48.73 to 19.14, 48.74 to 19.14)

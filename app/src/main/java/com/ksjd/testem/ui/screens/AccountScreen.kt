@@ -384,6 +384,23 @@ private fun AccountOverview(viewModel: AppViewModel, onUnlock: () -> Unit, onSig
                 onClick = { setP2p(!p2p) },
                 trailing = { Switch(p2p, setP2p) }
             )
+            // 2.19.0: whether it works: when this phone last heard from, and last passed on to, a phone nearby.
+            if (p2p) {
+                val heardAt by com.ksjd.testem.p2p.P2pStore.lastHeardMs.collectAsState()
+                val offeredAt by com.ksjd.testem.p2p.P2pStore.lastOfferedMs.collectAsState()
+                val clock by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+                    while (true) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(30_000L) }
+                }
+                val minutes = { at: Long -> ((clock - at) / 60_000L).toInt().coerceAtLeast(0) }
+                Text(
+                    listOfNotNull(
+                        heardAt.takeIf { it > 0 }?.let { stringResource(R.string.p2p_status_heard, minutes(it)) },
+                        offeredAt.takeIf { it > 0 }?.let { stringResource(R.string.p2p_status_offered, minutes(it)) }
+                    ).ifEmpty { listOf(stringResource(R.string.p2p_status_none)) }.joinToString("\n"),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
             GroupDivider()
             var haptics by remember { mutableStateOf(prefs.getHapticsEnabled()) }
             val setHaptics: (Boolean) -> Unit = { on ->

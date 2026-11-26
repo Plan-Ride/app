@@ -192,6 +192,15 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                         Icon(Icons.Outlined.Share, stringResource(if (sharing != null) R.string.eta_sharing else R.string.eta_share), tint = on)
                     }
                 }
+                // EM-0133: before the bus is followed live (planned, or still loading): the journey as a link to send.
+                if (p == null) {
+                    IconButton(onClick = {
+                        haptic(Haptics.TAP)
+                        com.ksjd.testem.live.ShareTrip.share(context, trip, trip.nextLegs.lastOrNull()?.toStop ?: trip.toStop ?: trip.ref.destination)
+                    }) {
+                        Icon(Icons.Outlined.Share, stringResource(R.string.share_trip), tint = on)
+                    }
+                }
                 IconButton(onClick = { haptic(Haptics.CONFIRM); TripTracking.stop(context) }) {
                     Icon(Icons.Outlined.Close, stringResource(R.string.track_stop), tint = on)
                 }
@@ -239,10 +248,14 @@ fun FollowCard(trip: TrackedTrip, view: FollowView?, now: Long, modifier: Modifi
                     Spacer(Modifier.height(8.dp))
                     DelayPill(summary, on)
                     // 2.19.0: no data: say what the card is going on (when it was last known, or a phone nearby).
-                    view.detail.offlineSinceMs.takeIf { it > 0 }?.let { since ->
+                    if (view.detail.offlineSinceMs > 0 || view.detail.fromOfflinePack) {
+                        val since = view.detail.offlineSinceMs
                         Text(
-                            if (view.detail.positionSource == com.ksjd.testem.live.PositionSource.Nearby) stringResource(R.string.p2p_heard)
-                            else stringResource(R.string.p2p_offline, ((now - since) / 60_000L).toInt().coerceAtLeast(0)),
+                            when {
+                                view.detail.positionSource == com.ksjd.testem.live.PositionSource.Nearby -> stringResource(R.string.p2p_heard)
+                                view.detail.fromOfflinePack -> stringResource(R.string.p2p_offline_timetable)
+                                else -> stringResource(R.string.p2p_offline, ((now - since) / 60_000L).toInt().coerceAtLeast(0))
+                            },
                             color = on.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp)
                         )
                     }

@@ -34,7 +34,9 @@ data class TripSheetState(
     val alightOrder: Int? = null,
     val detail: TripDetail? = null,
     val isLoading: Boolean = true,
-    val hasError: Boolean = false
+    val hasError: Boolean = false,
+    /** EM-0133: a whole journey opened (a shared link): the later buses show too, and Follow takes them all. */
+    val journey: TrackedTrip? = null
 )
 
 enum class LocationStatus { Idle, Locating, Denied, Unavailable, Ready }
@@ -328,7 +330,8 @@ class LiveViewModel(application: Application) : AndroidViewModel(application) {
 
     /** The bus being followed, with the user's stops, e.g. after tapping its notification. */
     fun openFollowed(trip: TrackedTrip) {
-        loadTrip(TripSheetState(trip.ref, boardingPlatformIds = trip.boardingPlatformIds, alightOrder = trip.alightOrder))
+        loadTrip(TripSheetState(trip.ref, boardingPlatformIds = trip.boardingPlatformIds, alightOrder = trip.alightOrder,
+            journey = trip.takeIf { it.nextLegs.isNotEmpty() }))
     }
 
     /** Where the user gets off the bus in the open sheet (to add it to a journey), null = clear. */

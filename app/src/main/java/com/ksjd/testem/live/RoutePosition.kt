@@ -87,6 +87,14 @@ object RoutePosition {
         return maxOf(nowMs, scheduledMs[left.coerceAtMost(scheduledMs.lastIndex)])
     }
 
+    /**
+     * EM-0130: delay of a bus seen between stops (not at one): against where the timetable has it at that point. A bus
+     * there isn't waiting for a departure, so an early one is early (measured against its last stop's time it looked a
+     * little later every second while it stood at a light, and the card went from 2 min early to on time).
+     */
+    fun delayBetween(index: Float, scheduledMs: List<Long>, nowMs: Long): Int =
+        ((nowMs - scheduledAt(index, scheduledMs)) / 1000L).toInt()
+
     /** Delay in seconds of a bus seen at [index] at [nowMs]. */
     fun delayAt(index: Float, scheduledMs: List<Long>, nowMs: Long): Int =
         ((nowMs - referenceAt(index, scheduledMs, nowMs)) / 1000L).toInt()

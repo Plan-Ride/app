@@ -877,6 +877,12 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="p2p_heard">Delay from a phone nearby, checked by Plan&amp;Ride</string>
     <string name="p2p_nearby_short">from a phone nearby</string>
     <string name="p2p_board_title">Departures: %1$s</string>
+    <string name="p2p_board_tap">Tap a bus to follow it.</string>
+    <string name="p2p_board_following">Following %1$s</string>
+    <string name="p2p_offline_timetable">No data: times from the offline timetable</string>
+    <string name="p2p_status_none">Nothing from phones nearby yet</string>
+    <string name="p2p_status_heard">Last heard from a phone nearby %1$d min ago</string>
+    <string name="p2p_status_offered">Last passed on to a phone nearby %1$d min ago</string>
     <string name="p2p_board_from">No data: from a phone nearby %1$d min ago, checked by Plan&amp;Ride</string>
     <string name="walk_other_switch">Walk to other stops</string>
     <string name="walk_other_switch_hint">A connection may start or end with a short walk to a nearby stop. Off: it starts and ends exactly at the stops you chose; a change between buses can still be a short walk to another stop.</string>

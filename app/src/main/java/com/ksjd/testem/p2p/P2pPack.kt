@@ -30,12 +30,33 @@ object P2pPack {
     data class Bus(val tripId: String, val lineId: Long, val tripNumber: Int, val delaySeconds: Int, val crowd: Int = 0)
     data class Pack(val atMs: Long, val buses: List<Bus>)
 
-    data class Departure(val line: String, val headsign: String, val leavesMs: Long, val delaySeconds: Int?)
+    /** A heard departure; [tripId] and [seq] (its stop number here) let a phone without data follow it. */
+    data class Departure(val line: String, val headsign: String, val leavesMs: Long, val delaySeconds: Int?, val tripId: String = "", val seq: Int = -1) {
+        /** Following it: emHUB's trip (from its stop here), with the stops from the offline timetables until there is data. */
+        fun trip(): com.ksjd.testem.live.TrackedTrip? {
+            if (tripId.isBlank() || seq < 0) return null
+            val local = java.time.Instant.ofEpochMilli(leavesMs).atZone(com.ksjd.testem.SK_ZONE)
+            return com.ksjd.testem.live.TrackedTrip(
+                com.ksjd.testem.live.TripRef(
+                    line = line, lineId = 0L, routeNumber = "", tripNumber = 0, destination = headsign,
+                    scheduleUrl = com.ksjd.testem.TimetableService.tripUrl(tripId, seq, null),
+                    serviceDate = local.toLocalDate().toString(), plannedSecondOfDay = local.toLocalTime().toSecondOfDay()
+                ),
+                emptyList(), departsAtMs = leavesMs
+            )
+        }
+    }
     /** A stop's next departures and its notices ([sk, en] each). */
     data class Board(val atMs: Long, val stop: String, val departures: List<Departure>, val notices: List<Pair<String, String>>)
 
     // okio's Base64: java.util.Base64 is missing on Android 7 (API 24-25).
     private fun b64(s: String): ByteArray = okio.ByteString.Companion.run { s.decodeBase64() }!!.toByteArray()
+
+    /** Why the last packet was not taken, for the log ("not signed by Plan&Ride", "too old: 17 min"). */
+    @Volatile var lastRefusal = ""
+        private set
+
+    private fun refuse(why: String): com.google.gson.JsonObject? { lastRefusal = why; return null }
 
     /** The payload if emHUB signed it (with either key), it is version 1 and neither too old nor from the future. */
     private fun payload(wire: ByteArray, nowMs: Long, keys: List<String>): com.google.gson.JsonObject? = runCatching {
@@ -45,9 +66,9 @@ object P2pPack {
         val buffer = ByteArray(1024)
         while (!inflater.finished()) {
             val n = inflater.inflate(buffer)
-            if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) return null
+            if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) return refuse("cut short or not a packet")
             out.write(buffer, 0, n)
-            if (out.size() > 64_000) return null // a deflate bomb
+            if (out.size() > 64_000) return refuse("too large") // a deflate bomb
         }
         inflater.end()
         val outer = com.google.gson.JsonParser.parseString(out.toString(Charsets.UTF_8.name())).asJsonObject
@@ -63,14 +84,15 @@ object P2pPack {
                 }
             }.getOrDefault(false)
         }
-        if (!signed) return null
+        if (!signed) return refuse("not signed by Plan&Ride")
         val p = com.google.gson.JsonParser.parseString(text).asJsonObject
-        if (p.get("v").asInt != 1) return null
+        if (p.get("v").asInt != 1) return refuse("version ${p.get("v")}")
         val at = p.get("at").asLong * 1000L
         // A phone's clock can be a little off; a packet much older (or from the future) is not taken.
-        if (nowMs - at > MAX_AGE_MS || at - nowMs > 5 * 60_000L) return null
+        if (nowMs - at > MAX_AGE_MS) return refuse("too old: ${(nowMs - at) / 60_000} min (check the phone's clock)")
+        if (at - nowMs > 5 * 60_000L) return refuse("from the future: ${(at - nowMs) / 60_000} min (check the phone's clock)")
         p
-    }.getOrNull()
+    }.getOrElse { refuse("not readable: ${it.javaClass.simpleName}") }
 
     /** A buses packet if it is emHUB's own and fresh; else null. */
     fun read(wire: ByteArray, nowMs: Long, keys: List<String> = HUB_KEYS): Pack? = payload(wire, nowMs, keys)
@@ -91,7 +113,8 @@ object P2pPack {
                     p.get("at").asLong * 1000L, p.get("st").asString,
                     p.getAsJsonArray("r").map { row ->
                         val r = row.asJsonArray
-                        Departure(r[0].asString, r[1].asString, r[2].asLong * 1000L, r[3].takeUnless { it.isJsonNull }?.asInt)
+                        Departure(r[0].asString, r[1].asString, r[2].asLong * 1000L, r[3].takeUnless { it.isJsonNull }?.asInt,
+                            if (r.size() > 5) r[4].asString else "", if (r.size() > 5) r[5].asInt else -1)
                     },
                     p.getAsJsonArray("n")?.map { n -> n.asJsonArray.let { it[0].asString to it[1].asString } }.orEmpty()
                 )
@@ -114,8 +137,18 @@ object P2pStore {
     @Volatile var boardWire: Pair<Long, ByteArray>? = null
         private set
 
+    /** For Settings: when this phone last heard a packet from a phone nearby, and last offered packets to others. */
+    val lastHeardMs = MutableStateFlow(0L)
+    val lastOfferedMs = MutableStateFlow(0L)
+
     /** Takes a received packet of either kind; true when it was emHUB's and fresh. */
     fun take(wire: ByteArray, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val taken = takeOne(wire, nowMs)
+        if (taken) lastHeardMs.value = nowMs
+        return taken
+    }
+
+    private fun takeOne(wire: ByteArray, nowMs: Long): Boolean {
         P2pPack.read(wire, nowMs)?.let { pack ->
             add(pack)
             if ((busesWire?.first ?: 0L) < pack.atMs) busesWire = pack.atMs to wire
@@ -147,6 +180,10 @@ object P2pStore {
         val keys = listOfNotNull(tripId, if (ref.lineId > 0) "sadzv:${ref.lineId}:${ref.tripNumber}" else null)
         return keys.firstNotNullOfOrNull { _heard.value[it] }?.takeIf { nowMs - it.atMs <= P2pPack.MAX_AGE_MS }
     }
+
+    /** What nearby phones said about a S.A.D. Zvolen bus on a live board (its sadzv line id and trip number). */
+    fun aboutSadzv(lineId: Long, tripNumber: Int, nowMs: Long = System.currentTimeMillis()): Heard? =
+        _heard.value["sadzv:$lineId:$tripNumber"]?.takeIf { lineId > 0 && nowMs - it.atMs <= P2pPack.MAX_AGE_MS }
 
     /** Back online: what was heard is no longer needed (and not passed on). */
     fun clearWires() {

@@ -81,4 +81,19 @@ class OfflineSearchTest {
         val found = OfflineTimetables.searchPack(tomorrow, setOf(0), setOf(2), day.plusDays(1).atTime(9, 50).atZone(SK_ZONE).toEpochSecond(), changeMin = 5).first()
         assertEquals(listOf("Bus 7", "Bus 9"), found.segments.map { it.line })
     }
+
+    @Test fun aBusHeardNearbyIsFoundOffline() {
+        // 2.19.0: line 4 from Y (its first stop) at 8:25 today, as a phone nearby passed it on: its stops and times.
+        val ref = com.ksjd.testem.live.TripRef("4", 0L, "", 0, "B", scheduleUrl = com.ksjd.testem.TimetableService.tripUrl("feed:4:x", 0, null),
+            serviceDate = day.toString(), plannedSecondOfDay = s(8, 25))
+        val trip = OfflineTimetables.tripIn(pack, ref)!!
+        assertEquals(listOf("Y", "B"), trip.stops.map { it.name })
+        assertEquals(1, trip.boardingOrder)
+        assertTrue(trip.fromOfflinePack)
+        assertEquals(day.atStartOfDay(com.ksjd.testem.SK_ZONE).toInstant().toEpochMilli() + s(8, 40) * 1000L, trip.stops[1].scheduledMs)
+        // Another time, another line, or a day it doesn't run: not that bus.
+        assertEquals(null, OfflineTimetables.tripIn(pack, ref.copy(plannedSecondOfDay = s(8, 26))))
+        assertEquals(null, OfflineTimetables.tripIn(pack, ref.copy(line = "Bus 3")))
+        assertEquals(null, OfflineTimetables.tripIn(pack, ref.copy(serviceDate = day.plusDays(1).toString())))
+    }
 }

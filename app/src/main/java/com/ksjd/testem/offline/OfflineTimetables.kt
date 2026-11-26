@@ -326,6 +326,43 @@ object OfflineTimetables {
         )
     }
 
+    /**
+     * 2.19.0: a timetable trip from the kept regions, for following a bus without data: the trip of [ref]'s line that
+     * runs on its day and leaves its stop (the trip link's stop number) at its planned second of the day. Its stops and
+     * times only: the delay comes from phones nearby. Null when no kept region has it.
+     */
+    fun tripDetail(ref: com.ksjd.testem.live.TripRef): com.ksjd.testem.live.TripDetail? =
+        kept.value.keys.firstNotNullOfOrNull { id -> pack(id)?.let { tripIn(it, ref) } }
+
+    internal fun tripIn(p: Pack, ref: com.ksjd.testem.live.TripRef): com.ksjd.testem.live.TripDetail? {
+        val from = com.ksjd.testem.TimetableService.parseTripUrl(ref.scheduleUrl)?.second ?: return null
+        val date = runCatching { LocalDate.parse(ref.serviceDate) }.getOrNull() ?: return null
+        if (ref.plannedSecondOfDay < 0) return null
+        val number = ref.line.trim().split(" ").last()
+        val start = date.atStartOfDay(SK_ZONE).toInstant().toEpochMilli()
+        run {
+            val t = p.lines.indices.firstOrNull { t ->
+                p.lines[t].trim().split(" ").last() == number && from < p.times[t].size &&
+                    // Seconds of the day, or past midnight on a trip that started the day before.
+                    (p.times[t][from] == ref.plannedSecondOfDay || p.times[t][from] == ref.plannedSecondOfDay + 86_400) &&
+                    p.runs(t, date)
+            } ?: return null
+            val dayStart = if (p.times[t][from] >= 86_400) start - 86_400_000L else start
+            val stops = p.stops[t].mapIndexed { k, s ->
+                com.ksjd.testem.live.TripStop(
+                    name = p.names[s], platformId = k + 1, order = k + 1, scheduledMs = dayStart + p.times[t][k] * 1000L, actualMs = null,
+                    lat = p.lats.getOrNull(s)?.takeIf { !it.isNaN() && it != 0.0 }, lon = p.lons.getOrNull(s)?.takeIf { !it.isNaN() && it != 0.0 }
+                )
+            }
+            return com.ksjd.testem.live.TripDetail(
+                line = ref.line, destination = p.headsigns.getOrNull(t)?.ifBlank { null } ?: stops.last().name, stops = stops,
+                delaySeconds = null, boardingOrder = from + 1, fromTimetable = true, fromOfflinePack = true,
+                vehicle = if (p.group(t) == "rail") "rail" else "bus"
+            )
+        }
+        return null
+    }
+
     /** The daily update of kept regions (only over the network; does nothing with none kept). */
     fun schedule(context: Context) {
         val work = WorkManager.getInstance(context)

@@ -245,7 +245,11 @@ class LiveRepository(context: Context) {
      */
     suspend fun getTrip(ref: TripRef): TripDetail = withContext(Dispatchers.IO) {
         val base = when {
-            ref.isScheduleOnly -> timetableTrip(ref)
+            // 2.19.0: no data (a bus heard from a phone nearby): its stops and times from the offline timetables.
+            ref.isScheduleOnly -> runCatching { timetableTrip(ref) }.getOrElse { failure ->
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                com.ksjd.testem.offline.OfflineTimetables.tripDetail(ref) ?: throw failure
+            }
             // A timetable bus without its trip link: sadzv knows nothing about it.
             ref.lineId == 0L -> timetableFallback(ref)?.let { t ->
                 t.copy(line = ref.line, destination = ref.destination.ifBlank { t.destination }, alightOrder = null, fromTimetable = true)

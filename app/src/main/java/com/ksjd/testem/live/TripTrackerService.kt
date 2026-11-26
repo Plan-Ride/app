@@ -625,11 +625,13 @@ class TripTrackerService : Service() {
     }
 
     /** The last known trip while there is no connection, with a nearby phone's newer delay when one was heard. */
-    private fun offlineDetail(current: TrackedTrip): TripDetail? {
-        val known = lastDetail ?: return null
-        if (com.ksjd.testem.p2p.P2p.online(this)) return null
+    private fun offlineDetail(current: TrackedTrip, fromPack: TripDetail? = null): TripDetail? {
+        // Following started without data: the trip from the offline timetables stands in for what emHUB would say.
+        val known = lastDetail ?: fromPack ?: return null
+        if (fromPack == null && com.ksjd.testem.p2p.P2p.online(this)) return null
         val heard = com.ksjd.testem.p2p.P2pStore.about(current.ref)?.takeIf { it.atMs > fetchedAt }
-        val base = known.copy(offlineSinceMs = fetchedAt, positionSource = if (known.positionSource.isLive) PositionSource.BusDelay else known.positionSource)
+        val base = known.copy(offlineSinceMs = if (known.fromOfflinePack) 0L else fetchedAt,
+            positionSource = if (known.positionSource.isLive) PositionSource.BusDelay else known.positionSource)
         return heard?.let {
             base.withDelay(it.delaySeconds).copy(
                 positionSource = PositionSource.Nearby,
@@ -811,7 +813,7 @@ class TripTrackerService : Service() {
         if (!moving) {
             // EM-0040: standing (traffic, a long stop) the bus gets later by the minute, though the timetable moves on.
             // Only later, never earlier: a bus waiting at a stop for its departure isn't early.
-            val standing = RoutePosition.delayAt(index, scheduled, now)
+            val standing = if (atStop) RoutePosition.delayAt(index, scheduled, now) else RoutePosition.delayBetween(index, scheduled, now)
             if (ridingBus && riderOffAt < 0 && standing > (localDelay?.first ?: detail.delaySeconds ?: 0)) {
                 localDelay = standing to now
                 localFromGps = true
@@ -822,14 +824,15 @@ class TripTrackerService : Service() {
         // EM-0104: between stops the place is measured along the straight line from stop to stop, which is rough: the
         // minutes to the next stop went up and down with every fix. The delay measured at the last stop stays, unless
         // the bus is clearly later than that (stuck on the way).
-        val between = RoutePosition.delayAt(index, scheduled, now)
+        val between = if (atStop) RoutePosition.delayAt(index, scheduled, now) else RoutePosition.delayBetween(index, scheduled, now)
         val held = stopDelay
         localDelay = (if (held != null && between - held < BETWEEN_STOPS_LATER_S) held else between) to now
         localFromGps = true
         redraw(current, detail)
         // Between stops: every 15 s.
         if (now - lastRiderReportAt < 15_000L) return
-        send(index.toInt().coerceIn(0, detail.stops.lastIndex), RoutePosition.referenceAt(index, scheduled, now))
+        send(index.toInt().coerceIn(0, detail.stops.lastIndex),
+            if (atStop) RoutePosition.referenceAt(index, scheduled, now) else RoutePosition.scheduledAt(index, scheduled))
     }
 
     /** "The bus is at stop [index] right now" ([leaving]: it is pulling out, the timetable's departure moment). */
@@ -1064,10 +1067,11 @@ class TripTrackerService : Service() {
                 trip = current
                 TripTracking.set(this@TripTrackerService, current)
             }
-            if (fetched != null && fetched.stops.isNotEmpty()) { lastDetail = fetched; fetchedAt = System.currentTimeMillis() }
+            val fromHub = fetched?.takeIf { it.stops.isNotEmpty() && !it.fromOfflinePack }
+            if (fromHub != null) { lastDetail = fromHub; fetchedAt = System.currentTimeMillis() }
             // 2.19.0: no data: the bus is followed on what was known (its stops, its last delay) and this phone's own GPS,
             // or on a delay a phone nearby passed on (emHUB-signed). Before, following stood still and then ended.
-            var detail = (fetched?.takeIf { it.stops.isNotEmpty() } ?: offlineDetail(current))?.let(::withLocalDelay)
+            var detail = (fromHub ?: offlineDetail(current, fetched?.takeIf { it.fromOfflinePack && it.stops.isNotEmpty() }))?.let(::withLocalDelay)
             if (p2pJob?.isActive != true) {
                 p2pJob = scope.launch { com.ksjd.testem.p2p.P2p.tick(this@TripTrackerService, lastFix?.let { it.latitude to it.longitude } ?: stopLatLon) }
             }
