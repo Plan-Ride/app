@@ -381,7 +381,8 @@ class TimetableService {
 
         /** value2 of suggestions from emhub; older saved ones came from cp.sk and are looked up by name. */
         const val HUB_STOP = "hub"
-        const val SADZV_FEED = "sad-zvolen-as"
+        /** S.A.D. Zvolen's city buses (emHUB reads them from sadzv): the only ones sadzv's live boards list. */
+        const val SADZV_CITY_FEED = "sad-zvolen-as-city"
 
         /** Least time between two buses (minutes, 0 = any) the planner leaves for a change: the rider's setting. */
         @Volatile var changeMinutes = 1

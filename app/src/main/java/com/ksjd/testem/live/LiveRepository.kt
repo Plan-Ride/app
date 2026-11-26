@@ -174,15 +174,18 @@ class LiveRepository(context: Context) {
     }
 
     /**
-     * Timetable buses the live board lacks: other carriers' (SAD Lučenec, Arriva, Slovak Lines, …), and S.A.D. Zvolen's
-     * own that sadzv's board leaves out (a Banská Bystrica trolleybus 3 at 14:17 was missing). S.A.D.'s only within the
-     * time the board covers: later ones it lists itself when they come closer.
+     * Timetable buses the live board lacks: other carriers' (SAD Lučenec, Arriva, Slovak Lines, …), S.A.D. Zvolen's
+     * intercity buses (sadzv's boards list only city lines), and S.A.D.'s city buses that sadzv's board leaves out (a
+     * Banská Bystrica trolleybus 3 at 14:17 was missing): those only within the time the board covers, as later ones it
+     * lists itself when they come closer.
      */
     private fun otherCarriers(rows: List<com.ksjd.testem.TimetableService.BoardRow>, live: List<LiveDeparture>): List<LiveDeparture> {
         val now = System.currentTimeMillis()
         val liveUntil = now + (live.maxOfOrNull { it.secondsUntil } ?: 0) * 1000L
         return rows.filter { row ->
-            !row.ends && (!row.feed.startsWith(com.ksjd.testem.TimetableService.SADZV_FEED) || row.atMs <= liveUntil) &&
+            // Only S.A.D.'s city buses wait for the live board (it lists them as they come closer). Its intercity buses
+            // ("sad-zvolen-as") never come onto it, and dropping them after the board's last row hid them altogether.
+            !row.ends && (row.feed != com.ksjd.testem.TimetableService.SADZV_CITY_FEED || row.atMs <= liveUntil) &&
                 row.atMs > now - 60_000L && live.none { sameBus(it, row) }
         }.map { row ->
             LiveDeparture(
