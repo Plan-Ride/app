@@ -322,10 +322,11 @@ private fun MainScaffold(
                     val here = if (com.ksjd.testem.CredentialsManager(appContext).getP2pNearby() && com.ksjd.testem.live.Locations.hasPermission(appContext))
                         com.ksjd.testem.live.Locations.current(appContext, maxAgeMs = 5 * 60_000L, fallbackToLastKnown = true)?.let { it.latitude to it.longitude }
                     else null
-                    com.ksjd.testem.p2p.P2p.tick(appContext, here)
+                    com.ksjd.testem.p2p.P2p.tick(appContext, here, foreground = true)
                     kotlinx.coroutines.delay(20_000L)
                 }
             } finally {
+                com.ksjd.testem.p2p.P2p.background(appContext)
                 if (com.ksjd.testem.live.TripTracking.active.value == null) com.ksjd.testem.p2p.P2p.stop(appContext)
             }
         }

@@ -173,6 +173,8 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
             )
             // 2.19.0: no data: the board a phone nearby passed on.
             com.ksjd.testem.ui.components.NearbyBoard(System.currentTimeMillis(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            // 2.19.0: no data: ask phones around for another stop's departures.
+            com.ksjd.testem.ui.components.AskNearbyPhones(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (state.stopsFailed) {
                 Notice(
                     stringResource(R.string.departures_stops_failed),

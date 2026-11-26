@@ -565,7 +565,7 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="planner_goes_on_as">Stay on, goes on as %1$s</string>
     <string name="track_goes_on_as">Goes on as line %1$s: stay on</string>
     <string name="whats_new_version" translatable="false">2.19.0</string>
-    <string name="whats_new_body">• No data? Plan&amp;Ride keeps following your bus on what it last knew and your own GPS, and says so on the card.\n• Help phones without data nearby (Settings): over Bluetooth your phone passes on bus delays, how full buses are, and the nearest stop\'s departures with notices. A phone without data passes them on too, so one phone with data can reach a whole bus.\n• Only what Plan&amp;Ride signed counts, and nothing about you or where you are going is sent.\n• Your change bus counts a delay from a phone nearby too, so you know if you will make it.</string>
+    <string name="whats_new_body">• No data? Plan&amp;Ride keeps following your bus on what it last knew and your own GPS, and says so on the card.\n• Help phones without data nearby (Settings): over Bluetooth your phone passes on bus delays, how full buses are, and the nearest stop\'s departures with notices. A phone without data passes them on too, so one phone with data can reach a whole bus.\n• Without data, ask phones around for any stop\'s departures: two other stops are asked with it, so nobody knows which you want.\n• Only what Plan&amp;Ride signed counts, and nothing about you is sent.\n• Share a whole journey with its changes, also before it starts, and see every bus\'s stops.</string>
     <string name="topup_button">Add credit</string>
     <string name="topup_title">Add credit to your card</string>
     <string name="topup_card">Card %1$s · credit now %2$s</string>
@@ -878,6 +878,13 @@ On the next screen, choose “Allow all the time”.</string>
     <string name="p2p_nearby_short">from a phone nearby</string>
     <string name="p2p_board_title">Departures: %1$s</string>
     <string name="p2p_board_tap">Tap a bus to follow it.</string>
+    <string name="p2p_ask_title">Another stop, without data</string>
+    <string name="p2p_ask_hint">Ask phones around with data for a stop\'s departures. Two other stops nearby are asked too, so nobody can tell which one you want.</string>
+    <string name="p2p_ask_search">Stop from the offline timetables</string>
+    <string name="p2p_ask_no_offline">No such stop in your offline timetables. Download your region in Settings.</string>
+    <string name="p2p_ask_waiting">Asking phones nearby for departures: %1$s (%2$d s)</string>
+    <string name="p2p_ask_stop">Stop asking</string>
+    <string name="p2p_ask_done">Done</string>
     <string name="p2p_board_following">Following %1$s</string>
     <string name="p2p_offline_timetable">No data: times from the offline timetable</string>
     <string name="p2p_status_none">Nothing from phones nearby yet</string>

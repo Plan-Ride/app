@@ -584,7 +584,7 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="follow_battery_needed">Sledovanie sa môže zastaviť, keď telefón Plan&amp;Ride na pozadí uspí. V nastaveniach aplikácie nastavte Batériu na Neobmedzené.</string>
     <string name="follow_battery_open">Otvoriť nastavenia</string>
     <string name="follow_battery_later">Teraz nie</string>
-    <string name="whats_new_body">• Bez dát? Plan&amp;Ride sleduje autobus ďalej podľa posledných údajov a vašej polohy a na karte to aj povie.\n• Pomáhať telefónom bez dát v okolí (Nastavenia): cez Bluetooth váš telefón posunie meškania autobusov, ich obsadenosť a odchody z najbližšej zastávky aj s oznamami. Telefón bez dát ich posúva ďalej, takže jeden telefón s dátami stačí pre celý autobus.\n• Platí len to, čo podpísal Plan&amp;Ride, a nič o vás ani o tom, kam idete, sa neposiela.\n• Aj meškanie autobusu na prestup sa dozviete od telefónu v okolí, takže viete, či ho stihnete.</string>
+    <string name="whats_new_body">• Bez dát? Plan&amp;Ride sleduje autobus ďalej podľa posledných údajov a vašej polohy a na karte to aj povie.\n• Pomáhať telefónom bez dát v okolí (Nastavenia): cez Bluetooth váš telefón posunie meškania autobusov, ich obsadenosť a odchody z najbližšej zastávky aj s oznamami. Telefón bez dát ich posúva ďalej, takže jeden telefón s dátami stačí pre celý autobus.\n• Bez dát sa opýtajte telefónov v okolí na odchody z ktorejkoľvek zastávky: spolu s ňou sa pýtate aj na dve iné, takže nikto nevie, ktorú chcete.\n• Platí len to, čo podpísal Plan&amp;Ride, a nič o vás sa neposiela.\n• Zdieľajte celú cestu s prestupmi aj pred odchodom a pozrite si zastávky každého autobusu.</string>
     <string name="topup_button">Dobiť kredit</string>
     <string name="topup_title">Dobitie kreditu na kartu</string>
     <string name="topup_card">Karta %1$s · teraz %2$s</string>
@@ -894,6 +894,13 @@ Na ďalšej obrazovke zvoľte „Povoliť vždy“.</string>
     <string name="p2p_nearby_short">od telefónu v okolí</string>
     <string name="p2p_board_title">Odchody: %1$s</string>
     <string name="p2p_board_tap">Ťuknite na autobus a budete ho sledovať.</string>
+    <string name="p2p_ask_title">Iná zastávka bez dát</string>
+    <string name="p2p_ask_hint">Opýtajte sa telefónov v okolí, ktoré majú dáta, na odchody zo zastávky. Spolu s ňou sa pýtate aj na dve iné zastávky v okolí, takže nikto nevie, ktorú chcete.</string>
+    <string name="p2p_ask_search">Zastávka z offline cestovných poriadkov</string>
+    <string name="p2p_ask_no_offline">Takú zastávku vo vašich offline cestovných poriadkoch nemáte. Stiahnite si svoj kraj v Nastaveniach.</string>
+    <string name="p2p_ask_waiting">Pýtam sa telefónov v okolí na odchody: %1$s (%2$d s)</string>
+    <string name="p2p_ask_stop">Prestať sa pýtať</string>
+    <string name="p2p_ask_done">Hotovo</string>
     <string name="p2p_board_following">Sledujete %1$s</string>
     <string name="p2p_offline_timetable">Bez dát: časy z offline cestovného poriadku</string>
     <string name="p2p_status_none">Od telefónov v okolí zatiaľ nič</string>

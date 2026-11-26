@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,9 +29,15 @@ import com.ksjd.testem.R
  */
 @Composable
 fun NearbyBoard(now: Long, modifier: Modifier = Modifier) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val heard by com.ksjd.testem.p2p.P2pStore.board.collectAsState()
     val board = heard?.takeIf { now - it.atMs <= com.ksjd.testem.p2p.P2pPack.MAX_AGE_MS } ?: return
+    BoardCard(board, now, modifier)
+}
+
+/** A heard stop board: its departures (tap one to follow it), delays and notices. */
+@Composable
+fun BoardCard(board: com.ksjd.testem.p2p.P2pPack.Board, now: Long, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val sk = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "sk"
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(20.dp), modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -57,6 +64,64 @@ fun NearbyBoard(now: Long, modifier: Modifier = Modifier) {
                     Spacer(Modifier.width(8.dp))
                     if (d.delaySeconds != null) { DelayLabel(d.delaySeconds); Spacer(Modifier.width(6.dp)) }
                     Text(com.ksjd.testem.ui.Format.clock(d.leavesMs), style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 2.19.0: without data, ask phones around for any stop's departures (stops from the offline timetables). Shown on the
+ * Departures tab with the setting on; asking stops when the tab closes, or after 5 minutes.
+ */
+@Composable
+fun AskNearbyPhones(modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = androidx.compose.runtime.remember { com.ksjd.testem.CredentialsManager(context) }
+    val online by androidx.compose.runtime.produceState(com.ksjd.testem.p2p.P2p.online(context)) {
+        while (true) { value = com.ksjd.testem.p2p.P2p.online(context); kotlinx.coroutines.delay(5_000L) }
+    }
+    val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+        while (true) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(1_000L) }
+    }
+    val asking by com.ksjd.testem.p2p.P2pAsk.asking.collectAsState()
+    val boards by com.ksjd.testem.p2p.P2pStore.boards.collectAsState()
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.ksjd.testem.p2p.P2pAsk.stop(context) } }
+    if (online || !prefs.getP2pNearby()) return
+    asking?.let { a ->
+        // Asked long enough: stop (the battery, and nobody near has data).
+        if (now - a.sinceMs > 5 * 60_000L && boards[a.stationId] == null) com.ksjd.testem.p2p.P2pAsk.stop(context)
+    }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val a = asking
+        val answer = a?.let { boards[it.stationId] }?.takeIf { now - it.atMs <= com.ksjd.testem.p2p.P2pPack.MAX_AGE_MS }
+        when {
+            a == null -> {
+                var text by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+                Text(stringResource(R.string.p2p_ask_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.p2p_ask_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.material3.OutlinedTextField(
+                    value = text, onValueChange = { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.p2p_ask_search)) }
+                )
+                if (text.isNotBlank()) {
+                    val found = androidx.compose.runtime.remember(text) { com.ksjd.testem.offline.OfflineTimetables.suggest(text, 6) }
+                    if (found.isEmpty()) Text(stringResource(R.string.p2p_ask_no_offline), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    found.forEach { s ->
+                        Text(s.selectedText, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth()
+                            .clickable { com.ksjd.testem.p2p.P2pAsk.ask(context, s.value, s.selectedText); text = "" }.padding(vertical = 10.dp))
+                    }
+                }
+            }
+            answer == null -> {
+                Notice(stringResource(R.string.p2p_ask_waiting, a.name, ((now - a.sinceMs) / 1000L).toInt()),
+                    actionLabel = stringResource(R.string.p2p_ask_stop), onAction = { com.ksjd.testem.p2p.P2pAsk.stop(context) })
+            }
+            else -> {
+                BoardCard(answer, now)
+                androidx.compose.material3.TextButton(onClick = { com.ksjd.testem.p2p.P2pAsk.stop(context) }) {
+                    Text(stringResource(R.string.p2p_ask_done))
                 }
             }
         }

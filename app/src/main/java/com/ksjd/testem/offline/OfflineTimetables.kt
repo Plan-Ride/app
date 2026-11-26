@@ -363,6 +363,24 @@ object OfflineTimetables {
         return null
     }
 
+    /**
+     * 2.19.0: [n] other stops within 8 km of [stationId] (random, from its kept region), asked for beside it so a phone
+     * hearing the question can't tell which stop is wanted. Empty when no kept region has it.
+     */
+    fun cover(stationId: String, n: Int): List<String> {
+        for (id in kept.value.keys) {
+            val p = pack(id) ?: continue
+            val i = p.ids.indexOf(stationId).takeIf { it >= 0 } ?: continue
+            val lat = p.lats.getOrNull(i) ?: return emptyList()
+            val lon = p.lons.getOrNull(i) ?: return emptyList()
+            return p.ids.indices.filter { j ->
+                j != i && p.lats.getOrNull(j)?.let { a -> p.lons.getOrNull(j)?.let { b ->
+                    com.ksjd.testem.live.LiveRepository.distanceMeters(lat, lon, a, b) <= 8_000 } } == true
+            }.shuffled().take(n).map { p.ids[it] }
+        }
+        return emptyList()
+    }
+
     /** The daily update of kept regions (only over the network; does nothing with none kept). */
     fun schedule(context: Context) {
         val work = WorkManager.getInstance(context)

@@ -205,6 +205,15 @@ object HubClient {
         bytes("wire")!! to bytes("board")
     }
 
+    /** 2.19.0: emHUB's signed boards for stops a phone without data asked for (their codes only), to broadcast as answers. */
+    suspend fun p2pBoards(codes: List<Int>, lat: Double, lon: Double): List<ByteArray> = withContext(Dispatchers.IO) {
+        val url = "${BuildConfig.HUB_URL}/api/v1/p2p/boards".toHttpUrl().newBuilder()
+            .addQueryParameter("codes", codes.take(3).joinToString(",") { "%06x".format(it) })
+            .addQueryParameter("lat", "%.3f".format(java.util.Locale.ROOT, lat)).addQueryParameter("lon", "%.3f".format(java.util.Locale.ROOT, lon)).build()
+        execute(Request.Builder().url(url).get()).getAsJsonArray("boards")
+            ?.mapNotNull { okio.ByteString.Companion.run { it.asString.decodeBase64() }?.toByteArray() }.orEmpty()
+    }
+
     /** 2.18.0: opens the connection to emHUB ahead of the first search; on mobile data that is most of the wait. */
     fun warm() {
         runCatching { client.newCall(Request.Builder().url("${BuildConfig.HUB_URL}/api/v1/health").head().build()).execute().close() }

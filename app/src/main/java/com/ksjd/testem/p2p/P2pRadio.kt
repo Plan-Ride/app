@@ -35,6 +35,7 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
 import java.util.UUID
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 
 /**
@@ -51,6 +52,10 @@ object P2pRadio {
     val SERVICE: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0190")
     private val BUSES: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0191")
     private val BOARD: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f0192")
+    /** 2.19.0 questions and answers: three readable answers (older phones read them), and the broadcasts' own ids. */
+    private val ANSWERS = (0 until 3).map { UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f019${3 + it}") }
+    private val QUESTION: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f01a0")
+    private val ANSWER: UUID = UUID.fromString("5a7d0c3e-2b19-4f60-9c1a-6e8b3d2f01a1")
     private const val NEARBY_ID = "com.ksjd.testem.p2p"
     private const val READ_AGAIN_MS = 60_000L
 
@@ -60,6 +65,13 @@ object P2pRadio {
     @Volatile var board: ByteArray? = null
         private set
 
+    /** Answers this phone broadcasts now (boards for asked stops, fetched or passed on). */
+    @Volatile var answers: List<ByteArray> = emptyList()
+        private set
+    private var asking: AdvertiseCallback? = null
+    private var questionScan: ScanCallback? = null
+    /** One-way answer broadcasts running (AdvertisingSetCallback, Android 8.0+; kept untyped so Android 7 never loads it). */
+    private val answerSets = mutableListOf<Any>()
     private var gattServer: BluetoothGattServer? = null
     private var advertising: AdvertiseCallback? = null
     private var scanning: ScanCallback? = null
@@ -77,7 +89,8 @@ object P2pRadio {
 
     /** For the bug report: which radios run now. */
     fun state(): String = "BLE advertising ${advertising != null}, BLE server ${gattServer != null}, BLE scanning ${scanning != null}, " +
-        "Nearby offering $nearbyOffering, Nearby listening $nearbyListening, reading $reading"
+        "Nearby offering $nearbyOffering, Nearby listening $nearbyListening, reading $reading, asking ${asking != null}, " +
+        "listening for questions ${questionScan != null}, answers ${answers.size} (${answerSets.size} as broadcasts)"
 
     /** The permissions the radios need on this Android version. */
     fun permissions(): Array<String> = when {
@@ -162,16 +175,20 @@ object P2pRadio {
                 }
 
                 override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int, characteristic: BluetoothGattCharacteristic) {
-                    val value = (if (characteristic.uuid == BOARD) board else buses) ?: ByteArray(0)
+                    val value = when (characteristic.uuid) {
+                        BOARD -> board
+                        BUSES -> buses
+                        else -> answers.getOrNull(ANSWERS.indexOf(characteristic.uuid))
+                    } ?: ByteArray(0)
                     if (value.isNotEmpty()) P2pStore.lastOfferedMs.value = System.currentTimeMillis()
                     val part = if (offset <= value.size) value.copyOfRange(offset, value.size) else ByteArray(0)
                     val sent = gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, part) == true
-                    P2pLog.add("BLE server: ${P2pLog.who(device.address)} read ${if (characteristic.uuid == BOARD) "board" else "buses"}" +
+                    P2pLog.add("BLE server: ${P2pLog.who(device.address)} read ${when (characteristic.uuid) { BOARD -> "board"; BUSES -> "buses"; else -> "answer" }}" +
                         (if (offset > 0) " from $offset" else "") + ", ${part.size} B" + if (!sent) ", answer FAILED" else "")
                 }
             })?.also { server ->
                 server.addService(BluetoothGattService(SERVICE, BluetoothGattService.SERVICE_TYPE_PRIMARY).apply {
-                    listOf(BUSES, BOARD).forEach {
+                    (listOf(BUSES, BOARD) + ANSWERS).forEach {
                         addCharacteristic(BluetoothGattCharacteristic(it, BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ))
                     }
                 })
@@ -209,7 +226,7 @@ object P2pRadio {
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             val client = Nearby.getConnectionsClient(context)
-            val packets = listOfNotNull(buses, board)
+            val packets = listOfNotNull(buses, board) + answers
             if (!result.status.isSuccess || packets.isEmpty()) {
                 P2pLog.add("Nearby: ${P2pLog.who(endpointId)} not connected (status ${result.status.statusCode}${if (packets.isEmpty()) ", nothing to send" else ""})")
                 return client.disconnectFromEndpoint(endpointId)
@@ -245,15 +262,24 @@ object P2pRadio {
             if (scanner == null) problem("BLE: can't scan (Bluetooth off?)")
             scanner?.let {
                 scanning = object : ScanCallback() {
-                    override fun onScanResult(callbackType: Int, result: ScanResult) = readBle(context, result.device, result.rssi, onPacket)
+                    override fun onScanResult(callbackType: Int, result: ScanResult) {
+                        // An answer broadcast one-way (no connection): take it as it is.
+                        val broadcast = result.scanRecord?.getServiceData(ParcelUuid(ANSWER))
+                        if (broadcast != null) {
+                            if (fresh("answer:" + broadcast.contentHashCode())) take(broadcast, "broadcast ${P2pLog.who(result.device.address)}", onPacket)
+                        } else if (result.scanRecord?.serviceUuids?.contains(ParcelUuid(SERVICE)) == true) {
+                            readBle(context, result.device, result.rssi, onPacket)
+                        }
+                    }
                     override fun onScanFailed(errorCode: Int) { P2pLog.add("BLE: listening failed: ${scanError(errorCode)}"); scanning = null }
                 }
                 it.startScan(
-                    listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE)).build()),
-                    ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build(),
+                    listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE)).build(),
+                        ScanFilter.Builder().setServiceData(ParcelUuid(ANSWER), ByteArray(0)).build()),
+                    scanSettings(),
                     scanning
                 )
-                P2pLog.add("BLE: listening")
+                P2pLog.add("BLE: listening (one-way broadcasts too: ${Build.VERSION.SDK_INT >= 26})")
             }
         }
         if (nearbyAllowed(context) && !nearbyListening) {
@@ -313,7 +339,7 @@ object P2pRadio {
             }
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 val service = gatt.getService(SERVICE) ?: return done(gatt, "no Plan&Ride service (status $status)")
-                listOf(BUSES, BOARD).mapNotNullTo(queue) { service.getCharacteristic(it) }
+                (listOf(BUSES, BOARD) + ANSWERS).mapNotNullTo(queue) { service.getCharacteristic(it) }
                 next(gatt)
             }
             private fun next(gatt: BluetoothGatt) {
@@ -359,6 +385,123 @@ object P2pRadio {
         override fun onDisconnected(endpointId: String) = Unit
     }
 
+    /** Extended advertising (Bluetooth 5) is heard too where Android can (8.0 and newer). */
+    private fun scanSettings(): ScanSettings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+        .apply { if (Build.VERSION.SDK_INT >= 26) setLegacy(false) }.build()
+
+    // ------------------------------------------------------------ questions and answers (only while the app is open)
+
+    /**
+     * Without data: broadcasts the question, three stop codes (the asked stop and two cover stops) as one advertisement
+     * nobody connects to. No name, no id, nothing else: the phone's Bluetooth address is random and changes.
+     */
+    fun ask(context: Context, codes: List<Int>) {
+        stopAsking(context)
+        if (!bluetoothAllowed(context)) return
+        val advertiser = adapter(context)?.bluetoothLeAdvertiser ?: return problem("BLE: can't ask (this phone can't advertise)")
+        val data = ByteArray(1 + 3 * codes.size)
+        data[0] = 1 // kind: a stop's departures
+        codes.forEachIndexed { i, c -> data[1 + 3 * i] = (c shr 16).toByte(); data[2 + 3 * i] = (c shr 8).toByte(); data[3 + 3 * i] = c.toByte() }
+        asking = object : AdvertiseCallback() {
+            override fun onStartSuccess(settingsInEffect: AdvertiseSettings) { P2pLog.add("BLE: question broadcast (${codes.size} stops)") }
+            override fun onStartFailure(errorCode: Int) { P2pLog.add("BLE: question failed: ${advertiseError(errorCode)}"); asking = null }
+        }
+        advertiser.startAdvertising(
+            Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED).setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+                .setConnectable(false).build(),
+            AdvertiseData.Builder().setIncludeDeviceName(false).setIncludeTxPowerLevel(false).addServiceData(ParcelUuid(QUESTION), data).build(),
+            asking
+        )
+    }
+
+    fun stopAsking(context: Context) {
+        val was = asking ?: return
+        runCatching { adapter(context)?.bluetoothLeAdvertiser?.stopAdvertising(was) }
+        asking = null
+    }
+
+    /** With data and the app open: hears questions; [onQuestion] gets each one's stop codes. */
+    fun listenForQuestions(context: Context, onQuestion: (List<Int>) -> Unit) {
+        if (questionScan != null || !bluetoothAllowed(context)) return
+        val scanner = adapter(context)?.bluetoothLeScanner ?: return problem("BLE: can't listen for questions (Bluetooth off?)")
+        questionScan = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                val data = result.scanRecord?.getServiceData(ParcelUuid(QUESTION)) ?: return
+                if (data.isEmpty() || data[0].toInt() != 1 || (data.size - 1) % 3 != 0) return
+                if (!fresh("question:" + data.contentHashCode())) return
+                val codes = (0 until (data.size - 1) / 3).map { i ->
+                    ((data[1 + 3 * i].toInt() and 0xFF) shl 16) or ((data[2 + 3 * i].toInt() and 0xFF) shl 8) or (data[3 + 3 * i].toInt() and 0xFF)
+                }
+                P2pLog.add("BLE: question from ${P2pLog.who(result.device.address)} (${result.rssi} dBm): ${codes.joinToString { "%06x".format(it) }}")
+                onQuestion(codes)
+            }
+            override fun onScanFailed(errorCode: Int) { P2pLog.add("BLE: listening for questions failed: ${scanError(errorCode)}"); questionScan = null }
+        }
+        scanner.startScan(listOf(ScanFilter.Builder().setServiceData(ParcelUuid(QUESTION), ByteArray(0)).build()), scanSettings(), questionScan)
+        P2pLog.add("BLE: listening for questions")
+    }
+
+    fun stopQuestions(context: Context) {
+        val was = questionScan ?: return
+        runCatching { adapter(context)?.bluetoothLeScanner?.stopScan(was) }
+        questionScan = null
+        P2pLog.add("BLE: stopped listening for questions")
+    }
+
+    /**
+     * Broadcasts answers (signed boards for asked stops) to everyone around: one-way (Bluetooth 5 extended advertising,
+     * nobody connects) where the phone can, and as readable values for older phones. Replaces the answers before.
+     */
+    fun answer(context: Context, wires: List<ByteArray>) {
+        val next = wires.take(ANSWERS.size)
+        if (next.size == answers.size && next.zip(answers).all { (a, b) -> a.contentEquals(b) }) return
+        answers = next
+        val bluetooth = adapter(context) ?: return
+        if (Build.VERSION.SDK_INT >= 26) OneWay.stop(bluetooth, answerSets)
+        answerSets.clear()
+        if (next.isEmpty()) return
+        if (bluetoothAllowed(context)) offerBle(context) // the readable values (older phones)
+        val oneWay = Build.VERSION.SDK_INT >= 26 && OneWay.supported(bluetooth)
+        val room = if (Build.VERSION.SDK_INT >= 26) OneWay.room(bluetooth) else 31
+        P2pLog.add("answering ${next.size} stops (${next.sumOf { it.size }} B); one-way broadcast: " +
+            if (oneWay) "yes, room $room B" else "no (this phone can't), readable only")
+        if (!oneWay || !bluetoothAllowed(context) || Build.VERSION.SDK_INT < 26) return
+        next.forEach { wire ->
+            if (wire.size + 20 > room) return@forEach P2pLog.add("answer ${wire.size} B too big for one broadcast here, readable only")
+            OneWay.start(bluetooth, ANSWER, wire)?.let { answerSets += it }
+        }
+    }
+
+    /** Bluetooth 5 extended advertising (Android 8.0+): an answer broadcast nobody connects to. */
+    @androidx.annotation.RequiresApi(26)
+    private object OneWay {
+        fun supported(bluetooth: android.bluetooth.BluetoothAdapter) = bluetooth.isLeExtendedAdvertisingSupported
+        fun room(bluetooth: android.bluetooth.BluetoothAdapter) = bluetooth.leMaximumAdvertisingDataLength
+
+        fun start(bluetooth: android.bluetooth.BluetoothAdapter, uuid: UUID, wire: ByteArray): Any? {
+            val advertiser = bluetooth.bluetoothLeAdvertiser ?: return null
+            val cb = object : android.bluetooth.le.AdvertisingSetCallback() {
+                override fun onAdvertisingSetStarted(set: android.bluetooth.le.AdvertisingSet?, txPower: Int, status: Int) {
+                    P2pLog.add(if (status == 0) "BLE: answer broadcast (${wire.size} B)" else "BLE: answer broadcast failed (status $status)")
+                }
+            }
+            return runCatching {
+                advertiser.startAdvertisingSet(
+                    android.bluetooth.le.AdvertisingSetParameters.Builder().setLegacyMode(false).setConnectable(false).setScannable(false)
+                        .setInterval(android.bluetooth.le.AdvertisingSetParameters.INTERVAL_MEDIUM)
+                        .setTxPowerLevel(android.bluetooth.le.AdvertisingSetParameters.TX_POWER_MEDIUM).build(),
+                    AdvertiseData.Builder().setIncludeDeviceName(false).addServiceData(ParcelUuid(uuid), wire).build(),
+                    null, null, null, 12_000, 0, cb // 2 minutes, then it ends by itself
+                )
+                cb
+            }.onFailure { P2pLog.add("BLE: answer broadcast failed: ${it.message}") }.getOrNull()
+        }
+
+        fun stop(bluetooth: android.bluetooth.BluetoothAdapter, sets: List<Any>) {
+            sets.forEach { cb -> runCatching { bluetooth.bluetoothLeAdvertiser?.stopAdvertisingSet(cb as android.bluetooth.le.AdvertisingSetCallback) } }
+        }
+    }
+
     fun stopListening(context: Context) {
         if (scanning != null || nearbyListening) P2pLog.add("listening stopped")
         runCatching { scanning?.let { adapter(context)?.bluetoothLeScanner?.stopScan(it) } }
@@ -370,6 +513,9 @@ object P2pRadio {
     fun stop(context: Context) {
         stopOffering(context)
         stopListening(context)
+        stopQuestions(context)
+        stopAsking(context)
+        answer(context, emptyList())
     }
 }
 
@@ -393,23 +539,66 @@ object P2p {
         cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     }.getOrDefault(false)
 
-    suspend fun tick(context: Context, at: Pair<Double, Double>?) = turn.withLock { round(context, at) }
+    /** [foreground]: the app is open (questions are heard and asked only then, to spare the battery). */
+    suspend fun tick(context: Context, at: Pair<Double, Double>?, foreground: Boolean = false) = turn.withLock {
+        if (at != null) lastAt = at
+        if (foreground) openUntil = System.currentTimeMillis() + 45_000L
+        round(context, at)
+    }
+
+    /** The app went to the background: no more questions (following, if on, goes on as before). */
+    fun background(context: Context) {
+        openUntil = 0L
+        P2pRadio.stopQuestions(context)
+        P2pAsk.stop(context)
+    }
+
+    @Volatile private var lastAt: Pair<Double, Double>? = null
+    @Volatile private var openUntil = 0L
+    private val asked = mutableMapOf<Int, Long>()
+    private val io = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /** A question heard: the boards for its stops from emHUB (each stop at most once a minute), broadcast to everyone. */
+    private fun onQuestion(context: Context, codes: List<Int>) {
+        val now = System.currentTimeMillis()
+        val fresh = synchronized(asked) {
+            asked.entries.removeAll { now - it.value > 60_000L }
+            codes.filter { it !in asked }.onEach { asked[it] = now }
+        }
+        val at = lastAt ?: return P2pLog.add("question heard, but no location yet to ask emHUB")
+        if (fresh.isEmpty()) return P2pLog.add("question heard: answered in the last minute already")
+        io.launch {
+            val boards = runCatching { com.ksjd.testem.hub.HubClient.p2pBoards(fresh, at.first, at.second) }
+                .onFailure { P2pLog.add("fetching asked boards failed: ${it.javaClass.simpleName} ${it.message.orEmpty().take(120)}") }.getOrNull()
+                ?: return@launch
+            P2pLog.add("fetched ${boards.size} asked boards (${boards.sumOf { it.size }} B)")
+            P2pRadio.answer(context, boards)
+        }
+    }
 
     private suspend fun round(context: Context, at: Pair<Double, Double>?) {
         if (!com.ksjd.testem.CredentialsManager(context).getP2pNearby() || !com.ksjd.testem.hub.HubClient.isConfigured) {
             if (mode.isNotEmpty() && mode != "off") mode("off (setting)")
             return stop(context)
         }
+        val open = System.currentTimeMillis() < openUntil
+        if (!open) P2pRadio.stopQuestions(context)
         if (!online(context)) {
             mode("no data: listening, passing on what is heard")
             fetchedAt = 0L
-            val passOn = { P2pRadio.offer(context, P2pStore.busesWire?.second, P2pStore.boardWire?.second) }
+            P2pRadio.stopQuestions(context)
+            val passOn = {
+                P2pRadio.offer(context, P2pStore.busesWire?.second, P2pStore.boardWire?.second)
+                // Answers heard are broadcast again too, newest first.
+                P2pRadio.answer(context, P2pStore.answerWires.values.sortedByDescending { it.first }.map { it.second })
+            }
             P2pRadio.listen(context, passOn)
             return passOn()
         }
-        mode("data: offering emHUB's packets")
+        mode("data: offering emHUB's packets" + if (open) ", answering questions" else "")
         P2pRadio.stopListening(context)
         P2pStore.clearWires()
+        if (open) P2pRadio.listenForQuestions(context) { codes -> onQuestion(context, codes) }
         val now = System.currentTimeMillis()
         if (at == null) return P2pLog.add("no location yet: nothing to fetch")
         if (now - fetchedAt < 60_000L) return

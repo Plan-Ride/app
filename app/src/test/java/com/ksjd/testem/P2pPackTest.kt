@@ -50,4 +50,9 @@ class P2pPackTest {
         assertNull("changed", P2pPack.read(forged, at, keys))
         assertNull("garbage", P2pPack.read(byteArrayOf(1, 2, 3), at, keys))
     }
+
+    @Test fun aStopsCodeIsEmHubs() {
+        // 2.19.0: the code a question carries; emHUB's test_hub.py checks the same stop gives 0x234534.
+        assertEquals(0x234534, P2pPack.code("banska bystrica plazove kupalisko"))
+    }
 }

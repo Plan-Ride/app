@@ -46,8 +46,19 @@ object P2pPack {
             )
         }
     }
-    /** A stop's next departures and its notices ([sk, en] each). */
-    data class Board(val atMs: Long, val stop: String, val departures: List<Departure>, val notices: List<Pair<String, String>>)
+    /** A stop's next departures and its notices ([sk, en] each); [stationId]: emHUB's id of the stop ("" in older packets). */
+    data class Board(val atMs: Long, val stop: String, val departures: List<Departure>, val notices: List<Pair<String, String>>,
+                     val stationId: String = "")
+
+    /**
+     * A stop as a phone without data asks for it over Bluetooth: 24 bits of FNV-1a over emHUB's station id (the id the
+     * offline timetables carry), as emHUB's p2p_hash. Three fit in one advertisement.
+     */
+    fun code(stationId: String): Int {
+        var h = 0x811C9DC5.toInt()
+        for (b in stationId.toByteArray(Charsets.UTF_8)) h = (h xor (b.toInt() and 0xFF)) * 0x01000193
+        return h and 0xFFFFFF
+    }
 
     // okio's Base64: java.util.Base64 is missing on Android 7 (API 24-25).
     private fun b64(s: String): ByteArray = okio.ByteString.Companion.run { s.decodeBase64() }!!.toByteArray()
@@ -116,7 +127,8 @@ object P2pPack {
                         Departure(r[0].asString, r[1].asString, r[2].asLong * 1000L, r[3].takeUnless { it.isJsonNull }?.asInt,
                             if (r.size() > 5) r[4].asString else "", if (r.size() > 5) r[5].asInt else -1)
                     },
-                    p.getAsJsonArray("n")?.map { n -> n.asJsonArray.let { it[0].asString to it[1].asString } }.orEmpty()
+                    p.getAsJsonArray("n")?.map { n -> n.asJsonArray.let { it[0].asString to it[1].asString } }.orEmpty(),
+                    p.get("sid")?.takeUnless { it.isJsonNull }?.asString.orEmpty()
                 )
             }.getOrNull()
         }
@@ -155,6 +167,16 @@ object P2pStore {
             return true
         }
         P2pPack.readBoard(wire, nowMs)?.let { board ->
+            // An asked stop's board (an answer to a question): kept by stop, and passed on as an answer.
+            if (board.stationId.isNotEmpty() && board.stationId in asked) {
+                if ((_boards.value[board.stationId]?.atMs ?: 0L) < board.atMs) _boards.value = _boards.value + (board.stationId to board)
+            }
+            if (board.stationId.isNotEmpty()) {
+                if ((answerWires[board.stationId]?.first ?: 0L) < board.atMs) {
+                    answerWires[board.stationId] = board.atMs to wire
+                    while (answerWires.size > 3) answerWires.remove(answerWires.minBy { it.value.first }.key)
+                }
+            }
             if ((_board.value?.atMs ?: 0L) < board.atMs) _board.value = board
             if ((boardWire?.first ?: 0L) < board.atMs) boardWire = board.atMs to wire
             return true
@@ -189,5 +211,14 @@ object P2pStore {
     fun clearWires() {
         busesWire = null
         boardWire = null
+        answerWires.clear()
     }
+
+    /** 2.19.0: the stops this phone asked about (their ids), and the boards that came back for them. */
+    @Volatile var asked: Set<String> = emptySet()
+    private val _boards = MutableStateFlow<Map<String, P2pPack.Board>>(emptyMap())
+    val boards: StateFlow<Map<String, P2pPack.Board>> = _boards
+
+    /** Answers heard (by stop id: when, packet), passed on to phones around; the 3 newest. */
+    val answerWires = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, ByteArray>>()
 }
