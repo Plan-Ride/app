@@ -440,13 +440,15 @@ class LiveRepository(context: Context) {
             if (detail != null || System.currentTimeMillis() - at < 10 * 60_000L) return detail
         }
         val stop = stopById(ref.fromStopId) ?: return null
+        // EM-0134: only a real "not in the timetable" is remembered for 10 min. A failed request (emHUB restarting, no
+        // signal) is asked again next time: it was remembered as a miss and the bus showed no stops for 10 minutes.
         val segment = runCatching {
             timetable.findTrip(stop.lat, stop.lon, ref.line, ref.plannedSecondOfDay / 60 % (24 * 60))
-        }.getOrNull()
+        }.getOrElse { return null }
         val detail = segment?.let { s ->
             runCatching {
                 timetableTrip(TripRef(ref.line, 0, "", 0, ref.destination, scheduleUrl = s.routeUrl, serviceDate = s.serviceDate))
-            }.getOrNull()?.takeIf { it.stops.isNotEmpty() }
+            }.getOrElse { return null }.takeIf { it.stops.isNotEmpty() }
         }
         synchronized(fallbackCache) { fallbackCache[key] = detail to System.currentTimeMillis() }
         return detail
