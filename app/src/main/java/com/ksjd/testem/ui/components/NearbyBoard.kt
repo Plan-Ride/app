@@ -102,15 +102,15 @@ fun AskResults(query: String, modifier: Modifier = Modifier, onAsked: () -> Unit
  * stops when the tab closes, or after 5 minutes without an answer.
  */
 @Composable
-fun AskNearbyPhones(modifier: Modifier = Modifier) {
+fun AskNearbyPhones(modifier: Modifier = Modifier, hidden: Boolean = false) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
         while (true) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(1_000L) }
     }
     val asking by com.ksjd.testem.p2p.P2pAsk.asking.collectAsState()
     val boards by com.ksjd.testem.p2p.P2pStore.boards.collectAsState()
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.ksjd.testem.p2p.P2pAsk.stop(context) } }
     val a = asking ?: return
+    if (hidden) return
     // Asked long enough: stop (the battery, and nobody near has data).
     if (now - a.sinceMs > 5 * 60_000L && boards[a.stationId] == null) com.ksjd.testem.p2p.P2pAsk.stop(context)
     val answer = boards[a.stationId]?.takeIf { now - it.atMs <= com.ksjd.testem.p2p.P2pPack.MAX_AGE_MS }

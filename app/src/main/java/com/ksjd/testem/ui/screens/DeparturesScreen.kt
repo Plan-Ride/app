@@ -141,6 +141,9 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
 
     // 2.19.0: no data and helping phones nearby on: the search asks phones around instead (stops from the offline timetables).
     val askNearby = com.ksjd.testem.ui.components.rememberAskNearby()
+    // Asking phones around ends when the Departures screen goes (not when its row scrolls out of the list: EM-0139).
+    val screenContext = LocalContext.current
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.ksjd.testem.p2p.P2pAsk.stop(screenContext) } }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = com.ksjd.testem.ui.components.barSpace())) {
         item {
             // A code someone told you (they share their bus): it opens here once they accept.
@@ -174,9 +177,11 @@ private fun StopFinder(state: LiveState, vm: LiveViewModel) {
                     .padding(horizontal = 16.dp, vertical = 4.dp)
             )
             // 2.19.0: no data: the board a phone nearby passed on.
-            com.ksjd.testem.ui.components.NearbyBoard(System.currentTimeMillis(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            // 2.19.0: no data: ask phones around for another stop's departures.
-            com.ksjd.testem.ui.components.AskNearbyPhones(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            // EM-0138: while a stop is typed, its results come right under the search; the boards heard wait below.
+            com.ksjd.testem.ui.components.AskNearbyPhones(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), hidden = state.query.isNotBlank())
+            if (state.query.isBlank()) {
+                com.ksjd.testem.ui.components.NearbyBoard(System.currentTimeMillis(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
             if (state.stopsFailed) {
                 Notice(
                     stringResource(R.string.departures_stops_failed),

@@ -48,7 +48,9 @@ object P2pPack {
     }
     /** A stop's next departures and its notices ([sk, en] each); [stationId]: emHUB's id of the stop ("" in older packets). */
     data class Board(val atMs: Long, val stop: String, val departures: List<Departure>, val notices: List<Pair<String, String>>,
-                     val stationId: String = "")
+                     val stationId: String = "",
+                     /** EM-0137: an answer to a question (the asked stop or a cover stop), not the stop around a phone. */
+                     val answer: Boolean = false)
 
     /**
      * A stop as a phone without data asks for it over Bluetooth: 24 bits of FNV-1a over emHUB's station id (the id the
@@ -128,7 +130,8 @@ object P2pPack {
                             if (r.size() > 5) r[4].asString else "", if (r.size() > 5) r[5].asInt else -1)
                     },
                     p.getAsJsonArray("n")?.map { n -> n.asJsonArray.let { it[0].asString to it[1].asString } }.orEmpty(),
-                    p.get("sid")?.takeUnless { it.isJsonNull }?.asString.orEmpty()
+                    p.get("sid")?.takeUnless { it.isJsonNull }?.asString.orEmpty(),
+                    p.get("q")?.asInt == 1
                 )
             }.getOrNull()
         }
@@ -153,29 +156,35 @@ object P2pStore {
     val lastHeardMs = MutableStateFlow(0L)
     val lastOfferedMs = MutableStateFlow(0L)
 
-    /** Takes a received packet of either kind; true when it was emHUB's and fresh. */
-    fun take(wire: ByteArray, nowMs: Long = System.currentTimeMillis()): Boolean {
-        val taken = takeOne(wire, nowMs)
+    /**
+     * Takes a received packet of either kind; true when it was emHUB's and fresh. [asAnswer]: it came as an answer (an
+     * answer value or a broadcast), for helpers from before emHUB marked answers.
+     */
+    fun take(wire: ByteArray, nowMs: Long = System.currentTimeMillis(), asAnswer: Boolean = false): Boolean {
+        val taken = takeOne(wire, nowMs, asAnswer)
         if (taken) lastHeardMs.value = nowMs
         return taken
     }
 
-    private fun takeOne(wire: ByteArray, nowMs: Long): Boolean {
+    private fun takeOne(wire: ByteArray, nowMs: Long, asAnswer: Boolean): Boolean {
         P2pPack.read(wire, nowMs)?.let { pack ->
             add(pack)
             if ((busesWire?.first ?: 0L) < pack.atMs) busesWire = pack.atMs to wire
             return true
         }
         P2pPack.readBoard(wire, nowMs)?.let { board ->
-            // An asked stop's board (an answer to a question): kept by stop, and passed on as an answer.
-            if (board.stationId.isNotEmpty() && board.stationId in asked) {
-                if ((_boards.value[board.stationId]?.atMs ?: 0L) < board.atMs) _boards.value = _boards.value + (board.stationId to board)
-            }
-            if (board.stationId.isNotEmpty()) {
-                if ((answerWires[board.stationId]?.first ?: 0L) < board.atMs) {
+            if (board.answer || asAnswer) {
+                // EM-0137: an answer (the asked stop or a cover stop): shown only as the answer to this phone's own
+                // question, passed on as an answer, never as "the stop around" (a cover stop took that place).
+                if (board.stationId in asked && (_boards.value[board.stationId]?.atMs ?: 0L) < board.atMs) {
+                    _boards.value = _boards.value + (board.stationId to board)
+                    P2pLog.add("answer for the asked stop: ${board.stop}, ${board.departures.size} departures")
+                }
+                if (board.stationId.isNotEmpty() && (answerWires[board.stationId]?.first ?: 0L) < board.atMs) {
                     answerWires[board.stationId] = board.atMs to wire
                     while (answerWires.size > 3) answerWires.remove(answerWires.minBy { it.value.first }.key)
                 }
+                return true
             }
             if ((_board.value?.atMs ?: 0L) < board.atMs) _board.value = board
             if ((boardWire?.first ?: 0L) < board.atMs) boardWire = board.atMs to wire

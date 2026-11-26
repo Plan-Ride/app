@@ -267,7 +267,7 @@ object P2pRadio {
                         val broadcast = result.scanRecord?.getServiceData(ParcelUuid(ANSWER))
                         if (broadcast != null) {
                             piece(broadcast)?.let { (id, whole) ->
-                                if (fresh("answer:$id")) take(whole, "broadcast ${P2pLog.who(result.device.address)}", onPacket)
+                                if (fresh("answer:$id")) take(whole, "broadcast ${P2pLog.who(result.device.address)}", onPacket, asAnswer = true)
                             }
                         } else if (result.scanRecord?.serviceUuids?.contains(ParcelUuid(SERVICE)) == true) {
                             readBle(context, result.device, result.rssi, onPacket)
@@ -310,8 +310,8 @@ object P2pRadio {
         true
     }
 
-    private fun take(packet: ByteArray?, from: String, onPacket: () -> Unit) {
-        val taken = packet?.isNotEmpty() == true && P2pStore.take(packet)
+    private fun take(packet: ByteArray?, from: String, onPacket: () -> Unit, asAnswer: Boolean = false) {
+        val taken = packet?.isNotEmpty() == true && P2pStore.take(packet, asAnswer = asAnswer)
         P2pLog.add("packet from $from (${packet?.size ?: 0} B): " + when {
             taken -> "taken"
             packet == null || packet.isEmpty() -> "empty (that phone has nothing to offer)"
@@ -348,17 +348,17 @@ object P2pRadio {
                 val c = queue.removeFirstOrNull() ?: return done(gatt, null)
                 if (!gatt.readCharacteristic(c)) done(gatt, "couldn't read")
             }
-            private fun read(gatt: BluetoothGatt, value: ByteArray?, status: Int) {
+            private fun read(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray?, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) P2pLog.add("BLE: $who read failed (status $status)")
-                take(value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE $who", onPacket)
+                take(value.takeIf { status == BluetoothGatt.GATT_SUCCESS }, "BLE $who", onPacket, asAnswer = characteristic.uuid in ANSWERS)
                 next(gatt)
             }
             @Deprecated("Android 12 and older")
             override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-                if (Build.VERSION.SDK_INT < 33) read(gatt, characteristic.value, status)
+                if (Build.VERSION.SDK_INT < 33) read(gatt, characteristic, characteristic.value, status)
             }
             override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int) =
-                read(gatt, value, status)
+                read(gatt, characteristic, value, status)
             private fun done(gatt: BluetoothGatt, problem: String?) {
                 if (!reading) return
                 if (problem != null) P2pLog.add("BLE: $who $problem")
